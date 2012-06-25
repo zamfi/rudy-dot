@@ -1,0 +1,40 @@
+<script type="text/javascript" src="/js/main.js"></script>
+
+<div id="toolbar">
+  <script type="text/x-handlebars">
+    <button class="btn btn-primary" {{action "play" target="Main.controller"}}><i class="icon-play icon-white"></i> Run</button>
+  </script>
+</div>
+
+<textarea id="editor">
+// Your code here.
+
+setup = function() {
+  size(400, 200);
+  background(255);
+  stroke(random(255));
+}
+
+var i = 0;
+draw = function() {
+  line(i, 0, i, height);
+  i += 4;
+  if (i > width) {
+    i = 0;
+    stroke(random(255));
+  }
+}
+
+</textarea>
+
+<script>
+var codeArea = CodeMirror.fromTextArea($('#editor')[0], {
+  mode: "javascript",
+  tabSize: 2,
+  lineNumbers: true
+});
+$(function() {
+  Main.controller.set('codeArea', codeArea);
+});
+</script>
+

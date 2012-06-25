@@ -1,0 +1,11 @@
+.CodeMirror {
+  border: 1px solid #ccc;
+}
+
+#toolbar {
+  margin: 0 0 10px 0;
+}
+
+body {
+  padding: 10px;
+}

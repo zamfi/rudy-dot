@@ -1,0 +1,19 @@
+<html>
+<head>
+<script type="text/javascript" src="/js/processing-1.3.6.js"></script>
+</head>
+<body>
+<canvas id="pjs"></canvas>
+
+<script type="text/javascript">
+function sketchProc(processing) {
+  with (processing) {
+    <%- code %>
+  }
+}
+var canvas = document.getElementById('pjs');
+var processingInstance = new Processing(canvas, sketchProc);
+</script>
+
+</body>
+</html>
