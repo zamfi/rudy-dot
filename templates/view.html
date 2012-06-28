@@ -8,7 +8,9 @@
 <script type="text/javascript">
 function sketchProc(processing) {
   with (processing) {
-    <%- code %>
+    (function() {
+      <%- code %>      
+    }());
   }
 }
 var canvas = document.getElementById('pjs');

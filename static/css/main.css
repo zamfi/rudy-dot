@@ -9,3 +9,40 @@
 body {
   padding: 10px;
 }
+
+.codemirror pre.line-warning {
+  background: #fcc;
+}
+
+.codemirror pre.gutter-warning {
+  color: red;
+  font-weight: bold;
+}
+
+.callout {
+  position: absolute;
+  margin-top: 7px;
+  background: #fee;
+  padding: 5px;
+  border: 1px solid #fcc;
+  margin-left: -10px;
+  border-radius: 6px;
+  box-shadow: 3px 3px 4px #cbb;
+}
+.callout .notch {
+  position: absolute;
+  top: -5px;
+  left: 8px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid #fee;
+}
+.callout .border-notch {
+  border-bottom-color: #fcc;
+  top: -6px;
+}
+.callout .close {
+  padding-left: 10px;
+  font-size: 16px;
+  line-height: 12px;
+}

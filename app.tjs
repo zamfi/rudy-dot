@@ -1,0 +1,101 @@
+var express = require('express'),
+    connect = require('connect');
+var fs = require('fs');
+
+var db = require('./db');
+
+var port = process.env.PORT || 8080;
+
+var app = express.createServer();
+
+app.configure(function() {
+  this.set('views', __dirname + '/templates');
+  this.set('view engine', 'ejs');
+  this.register('.html', require('ejs'));
+  // this.use(express.logger({
+  //   buffer: true,
+  //   // stream: logStream,
+  //   format: ':remote-addr - - [:date] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" :response-time ms'
+  // }));
+  this.use(express.cookieParser());
+  this.use(express.bodyParser());
+  this.use(connect.static(__dirname + '/static'));
+});
+
+var savedCode = {
+  run: fs.readFileSync('code/run.js', 'utf8'),
+  rudy: fs.readFileSync('code/robot.js', 'utf8')
+};
+
+app.get('/:template?', function(req, res, next) {
+  var template = req.params.template || 'run';
+  await db.create({latestCode: savedCode[template], versions: [savedCode[template]]}, defer (var err, doc));
+  if (err) {
+    return res.render('500.html', {err: err});
+  }
+  res.redirect('/edit/'+template+'/'+doc._id);
+});
+app.get('/edit/:template/:id', function(req, res, next) {
+  var template = req.params.template || 'run';
+  await db.get(req.params.id, defer (var err, doc));
+  if (err) {
+    return res.render('500.html', {err: err});
+  }
+  res.render('main.html', {template: template, initialCode: doc.latestCode, sketchId: req.params.id});
+})
+
+app.post('/save/:sketchId', function(req, res, next) {
+  var code = req.param('code');
+  var pushVersion = req.param('pushVersion') == "true";
+  
+  var updateParams = { $set: { latestCode: code } };
+  if (pushVersion) {
+    updateParams.$push = { versions: code };
+  }
+  await db.update(req.params.sketchId, updateParams, defer (var err, docs));
+  
+  var id = req.param('id');
+  if (id) {
+    if (savedCode[id]) {
+      savedCode[id](code);
+    }
+    savedCode[id] = code;    
+  }
+  
+  res.contentType('application/json');
+  res.end(JSON.stringify({status: 'ok'}));
+});
+
+var templateMap = {
+  run: 'view.html',
+  rudy: 'robot.html'
+}
+app.get('/:template/:id', function(req, res, next) {
+  var id = req.params.id;
+  var renderFunction = function(code) {
+    res.render(templateMap[req.params.template] || 'view.html', {layout: false, code: code});
+  };
+  if (savedCode[id]) {
+    renderFunction(savedCode[id]);
+  } else {
+    savedCode[id] = renderFunction;
+  }
+});
+
+app.all('*', function(req, res){
+  res.send('what???', 404);
+});
+
+process.on('uncaughtException', function(err) {
+  console.log('Caught unhandled exception.');
+  console.log(err.stack);
+});
+
+db.init(function(err) {
+  if (err) {
+    console.log("Failed to connect to DB", err);
+    process.exit(1);
+  }
+  app.listen(port);
+  console.log("Listening on port", port);  
+});
