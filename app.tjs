@@ -2,21 +2,30 @@ var express = require('express'),
     connect = require('connect');
 var fs = require('fs');
 
+var files = require("./files");
+var errorSave = require('./filesave').named("lint-errors");
 var db = require('./db');
 
 var port = process.env.PORT || 8080;
 
 var app = express.createServer();
+var io = require('socket.io').listen(app);
 
+var logStream;
+try {
+  logStream = new files.DatedFileStream('logs/access-%y-%m-%d.log');
+} catch (e) {
+  process.exit(1);
+}
 app.configure(function() {
   this.set('views', __dirname + '/templates');
   this.set('view engine', 'ejs');
   this.register('.html', require('ejs'));
-  // this.use(express.logger({
-  //   buffer: true,
-  //   // stream: logStream,
-  //   format: ':remote-addr - - [:date] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" :response-time ms'
-  // }));
+  this.use(express.logger({
+    buffer: true,
+    stream: logStream,
+    format: ':remote-addr - - [:date] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" :response-time ms'
+  }));
   this.use(express.cookieParser());
   this.use(express.bodyParser());
   this.use(connect.static(__dirname + '/static'));
@@ -27,7 +36,11 @@ var savedCode = {
   rudy: fs.readFileSync('code/robot.js', 'utf8')
 };
 
-app.get('/:template?', function(req, res, next) {
+app.get('/', function(req, res, next) {
+  res.render('home.html');
+});
+
+app.get('/new/:template?', function(req, res, next) {
   var template = req.params.template || 'run';
   await db.create({latestCode: savedCode[template], versions: [savedCode[template]]}, defer (var err, doc));
   if (err) {
@@ -41,7 +54,7 @@ app.get('/edit/:template/:id', function(req, res, next) {
   if (err) {
     return res.render('500.html', {err: err});
   }
-  res.render('main.html', {template: template, initialCode: doc.latestCode, sketchId: req.params.id});
+  res.render('edit.html', {template: template, initialCode: doc.latestCode, sketchId: req.params.id});
 })
 
 app.post('/save/:sketchId', function(req, res, next) {
@@ -56,7 +69,10 @@ app.post('/save/:sketchId', function(req, res, next) {
   
   var id = req.param('id');
   if (id) {
-    if (savedCode[id]) {
+    if (req.param('instrumentedCode')) {
+      code = req.param('instrumentedCode');
+    }
+    if (typeof savedCode[id] == 'function') {
       savedCode[id](code);
     }
     savedCode[id] = code;    
@@ -66,16 +82,34 @@ app.post('/save/:sketchId', function(req, res, next) {
   res.end(JSON.stringify({status: 'ok'}));
 });
 
+app.post('/noteError', function(req, res, next) {
+  var code = req.param('code');
+  var errors = req.param('errors');
+  errorSave.save({
+    code: code,
+    errors: JSON.parse(errors)
+  });
+});
+
+app.post('/runtimeError', function(req, res, next) {
+  var id = req.param('id');
+  console.log("noting runtime error for ", id);
+  if (socketRegistrations[id]) {
+    socketRegistrations[id].emit('runtime error', {line: Number(req.param('line')), char: Number(req.param('char')), msg: req.param("msg")});
+  }
+  res.end(JSON.stringify({status: 'ok'}));
+});
+
 var templateMap = {
   run: 'view.html',
   rudy: 'robot.html'
 }
-app.get('/:template/:id', function(req, res, next) {
+app.get('/:template/:sketch/:id', function(req, res, next) {
   var id = req.params.id;
   var renderFunction = function(code) {
-    res.render(templateMap[req.params.template] || 'view.html', {layout: false, code: code});
+    res.render(templateMap[req.params.template] || 'view.html', {layout: false, code: code, sketchId: req.params.sketch});
   };
-  if (savedCode[id]) {
+  if (typeof savedCode[id] == 'string') {
     renderFunction(savedCode[id]);
   } else {
     savedCode[id] = renderFunction;
@@ -85,6 +119,20 @@ app.get('/:template/:id', function(req, res, next) {
 app.all('*', function(req, res){
   res.send('what???', 404);
 });
+
+
+var socketRegistrations = {};
+io.sockets.on('connection', function(socket) {
+  var id;
+  socket.on('register', function(data) {
+    console.log("registration!", data.id);
+    socketRegistrations[id = data.id] = socket;
+  });
+  socket.on('disconnect', function() {
+    delete socketRegistrations[id];
+  });
+});
+
 
 process.on('uncaughtException', function(err) {
   console.log('Caught unhandled exception.');

@@ -13,6 +13,21 @@ window.Main = Em.Application.create({
               }
               predef.setup = true;
               predef.draw = true;
+              predef.mousePressed = true;
+              predef.mouseClicked = true;
+              predef.mouseDragged = true;
+              predef.mouseMoved = true;
+              predef.mouseReleased = true;
+              predef.mouseScrolled = true;
+              predef.mouseOver = true;
+              predef.mouseOut = true;
+              predef.touchStart = true;
+              predef.touchEnd = true;
+              predef.touchMove = true;
+              predef.touchCancel = true;
+              predef.keyPressed = true;
+              predef.keyReleased = true;
+              predef.keyTyped = true;
             });
             break;
           case 'rudy':
@@ -22,7 +37,7 @@ window.Main = Em.Application.create({
             predef.down = false;
             predef.coloring = false;
             predef.setLevel = false;
-            predef.trashRemaining = false;
+            predef.remainingDots = false;
             break;
         }
         this.set('predef', predef);
@@ -47,6 +62,62 @@ window.Main = Em.Application.create({
       if (! pass) {
         return JSLINT.errors;
       }
+    }
+  }),
+  
+  instrumentor: Em.Object.create({
+    instrument: function(code, tree) {
+      var checkPoints = [];
+      var lines = code.split("\n");
+      function handleNode(node) {
+        if (node instanceof Array) {
+          return node.forEach(handleNode);
+        }
+        if (node.first) {
+          handleNode(node.first);
+        }
+        if (node.second) {
+          handleNode(node.second);
+        }
+        if (node.block) {
+          handleBlock(node.block);
+        }
+      }
+      function getNodeStart(node) {
+        switch(node.arity) {
+          case "infix": case "suffix":
+            return getNodeStart(node.first);
+          default:
+            return {line: node.line, from: node.from};
+        }
+      }
+      function handleBlock(block, skipInsertion) {
+        if (! skipInsertion) {
+          checkPoints.push(getNodeStart(block[0]));
+        }
+        for (var i = block.length-1; i >= 0; --i) {
+          handleNode(block[i])
+        }
+      }
+      handleBlock(tree.first, true);
+      checkPoints.sort(function(a, b) {
+        return a.line == b.line ? a.line - b.line : a.from - b.from;
+      }).reverse();
+      checkPoints.forEach(function(loc) {
+        var line = loc.line-1; // 1-indexed.
+        var chr  = loc.from-1; // also 1-indexed.
+        var curLine = lines[line];
+        lines[line] = curLine.substr(0, chr)+"__ck("+loc.line+","+loc.from+"); "+curLine.substr(chr);
+      });
+      // console.log(checkPoints);
+      var newCode = lines.join("\n");
+      // console.log(newCode);
+      return newCode;
+    },
+    test: function() {
+      var code = Main.controller.getCode();
+      Main.controller.validate(code);
+      console.log(this.instrument(code, JSLINT.tree));
     }
   }),
   
@@ -77,7 +148,7 @@ window.Main = Em.Application.create({
         var lineHandle = codeArea.setMarker(error.line-1, '%N%', 'gutter-warning');
         codeArea.setLineClass(lineHandle, null, 'line-warning');
         markedLines.push(lineHandle);
-        return this.showErrorBox(error.line-1, error.character, error.reason);
+        return this.showErrorBox(error.line-1, error.character-1||1, error.reason);
       }, this);
       
       boxes.reverse().forEach(function(box) {
@@ -96,7 +167,7 @@ window.Main = Em.Application.create({
         box.append($('<span>').text(msg));
         box.append($('<div class="border-notch notch">'))
         box.append($('<div class="notch">'))
-        codeArea.addWidget({line: line, ch: character-1||1}, box[0], true);        
+        codeArea.addWidget({line: line, ch: character}, box[0], true);        
       };
     },
     codeAreaBinding: "Main.controller.codeArea"
@@ -107,20 +178,32 @@ window.Main = Em.Application.create({
       Main.errorController.clearErrors();
       var errors = Main.syntaxChecker.check(code);
       if (errors) {
-        console.log(errors);
+        $.ajax('/noteError', {
+          type: 'post',
+          data: {
+            code: code,
+            errors: JSON.stringify(errors)
+          }
+        });
         Main.errorController.markErrors(errors);
       }
       return ! errors;
+    },
+    getCode: function() {
+      return this.get('codeArea').getValue();
     },
     
     codeArea: null,
     codeTemplate: 'run',
     sketchId: null,
-    doSave: function(randomId, code, pushVersion, cb) {
+    doSave: function(randomId, code, instrumentedCode, pushVersion, cb) {
       var data = {
         code: code,
         pushVersion: pushVersion
       };
+      if (instrumentedCode) {
+        data.instrumentedCode = instrumentedCode;
+      }
       if (randomId) {
         data.id = randomId;
       }
@@ -129,14 +212,14 @@ window.Main = Em.Application.create({
         data: data,
         success: function(data, textStatus, xhr) {
           if (data.status == 'ok') {
-            cb(true);
+            (cb || Em.K)(true);
           } else {
             console.log("error!");
-            cb(false);
+            (cb || Em.K)(false);
           }
         },
         error: function() {
-          cb(false);
+          (cb || Em.K)(false);
         }
       });      
     }, 
@@ -146,8 +229,9 @@ window.Main = Em.Application.create({
       if (! this.validate(code)) {
         return;
       }
-      this.doSave(randomId, code, true);
-      window.open('/'+this.get('codeTemplate')+'/'+randomId, 'rudy-'+this.get('codeTemplate'));
+      var instrumentedCode = Main.instrumentor.instrument(code, JSLINT.tree);
+      this.doSave(randomId, code, instrumentedCode, true);
+      window.open('/'+this.get('codeTemplate')+'/'+sketchId+'/'+randomId, 'rudy-'+this.get('codeTemplate'));
     },
     
     status: function() {
@@ -162,7 +246,7 @@ window.Main = Em.Application.create({
     timeoutFunction: function() {
       var savedChange = this.get('lastChange');
       var self = this;
-      this.doSave(null, this.get('codeArea').getValue(), false, function(ok) {
+      this.doSave(null, this.get('codeArea').getValue(), null, false, function(ok) {
         if (self.get('lastChange') > savedChange) {
           self.set('saveTimeout', setTimeout(function() { self.timeoutFunction() }, 1000));
         } else {
