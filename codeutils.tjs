@@ -1,0 +1,74 @@
+var JSLINT = require('./static/js/jslint.js').JSLINT;
+
+var predefs = {
+  run: {"externals":false,"name":false,"use3DContext":false,"focused":false,"breakShape":false,"glyphTable":false,"pmouseX":false,"pmouseY":false,"mouseX":false,"mouseY":false,"mouseButton":false,"mouseScroll":false,"mouseClicked":true,"mouseDragged":true,"mouseMoved":true,"mousePressed":true,"mouseReleased":true,"mouseScrolled":true,"mouseOver":true,"mouseOut":true,"touchStart":true,"touchEnd":true,"touchMove":true,"touchCancel":true,"key":false,"keyCode":false,"keyPressed":true,"keyReleased":true,"keyTyped":true,"draw":true,"setup":true,"__mousePressed":false,"__keyPressed":false,"__frameRate":false,"frameCount":false,"width":false,"height":false,"Character":false,"PShape":false,"PShapeSVG":false,"shape":false,"shapeMode":false,"loadShape":false,"XMLElement":false,"PMatrix2D":false,"PMatrix3D":false,"PMatrixStack":false,"split":false,"splitTokens":false,"append":false,"concat":false,"sort":false,"splice":false,"subset":false,"join":false,"shorten":false,"expand":false,"arrayCopy":false,"reverse":false,"mix":false,"peg":false,"modes":false,"color":false,"brightness":false,"saturation":false,"hue":false,"red":false,"green":false,"blue":false,"alpha":false,"lerpColor":false,"colorMode":false,"blendColor":false,"printMatrix":false,"rotateX":false,"rotateY":false,"pushStyle":false,"popStyle":false,"year":false,"month":false,"day":false,"hour":false,"minute":false,"second":false,"millis":false,"noLoop":false,"loop":false,"frameRate":false,"exit":false,"cursor":false,"noCursor":false,"link":false,"beginDraw":false,"endDraw":false,"status":false,"binary":false,"unbinary":false,"nf":false,"nfs":false,"nfp":false,"nfc":false,"hex":false,"unhex":false,"loadStrings":false,"saveStrings":false,"loadBytes":false,"matchAll":false,"__contains":false,"__replaceAll":false,"__replaceFirst":false,"__replace":false,"__equals":false,"__equalsIgnoreCase":false,"__toCharArray":false,"__split":false,"__codePointAt":false,"match":false,"__startsWith":false,"__endsWith":false,"__hashCode":false,"__printStackTrace":false,"println":false,"print":false,"str":false,"trim":false,"parseBoolean":false,"parseByte":false,"parseChar":false,"parseFloat":false,"parseInt":false,"__int_cast":false,"__instanceof":false,"abs":false,"ceil":false,"constrain":false,"dist":false,"exp":false,"floor":false,"lerp":false,"log":false,"mag":false,"map":false,"max":false,"min":false,"norm":false,"pow":false,"round":false,"sq":false,"sqrt":false,"acos":false,"asin":false,"atan":false,"atan2":false,"cos":false,"degrees":false,"radians":false,"sin":false,"tan":false,"random":false,"randomSeed":false,"Random":false,"noise":false,"noiseDetail":false,"noiseSeed":false,"lights":false,"camera":false,"perspective":false,"ortho":false,"printProjection":false,"printCamera":false,"sphereDetail":false,"modelX":false,"modelY":false,"modelZ":false,"screenX":false,"screenY":false,"screenZ":false,"noFill":false,"noStroke":false,"strokeCap":false,"strokeJoin":false,"beginShape":false,"texture":false,"textureMode":false,"curveTightness":false,"curveDetail":false,"rectMode":false,"imageMode":false,"ellipseMode":false,"arc":false,"bezierDetail":false,"bezierPoint":false,"bezierTangent":false,"curvePoint":false,"curveTangent":false,"triangle":false,"quad":false,"normal":false,"save":false,"saveFrame":false,"PImage":false,"createImage":false,"loadImage":false,"requestImage":false,"get":false,"createGraphics":false,"set":false,"imageData":false,"pixels":false,"loadPixels":false,"updatePixels":false,"hint":false,"tint":false,"noTint":false,"copy":false,"blend":false,"filter":false,"shared":false,"intersect":false,"blit_resize":false,"loadFont":false,"createFont":false,"textFont":false,"textSize":false,"textAscent":false,"textDescent":false,"textLeading":false,"textAlign":false,"glyphLook":false,"text":false,"textMode":false,"loadGlyphs":false,"param":false,"disableContextMenu":false,"enableContextMenu":false,"constructor":false,"translate":false,"scale":false,"pushMatrix":false,"popMatrix":false,"resetMatrix":false,"applyMatrix":false,"rotate":false,"rotateZ":false,"redraw":false,"toImageData":false,"ambientLight":false,"directionalLight":false,"lightFalloff":false,"lightSpecular":false,"pointLight":false,"noLights":false,"spotLight":false,"beginCamera":false,"endCamera":false,"frustum":false,"box":false,"sphere":false,"ambient":false,"emissive":false,"shininess":false,"specular":false,"fill":false,"stroke":false,"strokeWeight":false,"smooth":false,"noSmooth":false,"point":false,"vertex":false,"endShape":false,"bezierVertex":false,"curveVertex":false,"curve":false,"line":false,"bezier":false,"rect":false,"ellipse":false,"background":false,"image":false,"textWidth":false,"size":false,"ArrayList":false,"HashMap":false,"PVector":false,"ObjectIterator":false,"PConstants":false,"defineProperty":false,"extendClassChain":false,"extendStaticMembers":false,"extendInterfaceMembers":false,"addMethod":false,"createJavaArray":false,"delay":false,"PrintWriter":false,"endRaw":false,"beginRaw":false,"createReader":false,"saveBytes":false,"selectInput":false,"endRecord":false,"saveStream":false,"beginRecord":false,"selectOutput":false,"createWriter":false,"dataPath":false,"selectFolder":false,"BufferedReader":false,"createInput":false,"createOutput":false,"open":false,"PFont":false,"X":false,"Y":false,"Z":false,"R":false,"G":false,"B":false,"A":false,"U":false,"V":false,"NX":false,"NY":false,"NZ":false,"EDGE":false,"SR":false,"SG":false,"SB":false,"SA":false,"SW":false,"TX":false,"TY":false,"TZ":false,"VX":false,"VY":false,"VZ":false,"VW":false,"AR":false,"AG":false,"AB":false,"DR":false,"DG":false,"DB":false,"DA":false,"SPR":false,"SPG":false,"SPB":false,"SHINE":false,"ER":false,"EG":false,"EB":false,"BEEN_LIT":false,"VERTEX_FIELD_COUNT":false,"P2D":false,"JAVA2D":false,"WEBGL":false,"P3D":false,"OPENGL":false,"PDF":false,"DXF":false,"OTHER":false,"WINDOWS":false,"MAXOSX":false,"LINUX":false,"EPSILON":false,"MAX_FLOAT":false,"MIN_FLOAT":false,"MAX_INT":false,"MIN_INT":false,"PI":false,"TWO_PI":false,"HALF_PI":false,"THIRD_PI":false,"QUARTER_PI":false,"DEG_TO_RAD":false,"RAD_TO_DEG":false,"WHITESPACE":false,"RGB":false,"ARGB":false,"HSB":false,"ALPHA":false,"CMYK":false,"TIFF":false,"TARGA":false,"JPEG":false,"GIF":false,"BLUR":false,"GRAY":false,"INVERT":false,"OPAQUE":false,"POSTERIZE":false,"THRESHOLD":false,"ERODE":false,"DILATE":false,"REPLACE":false,"BLEND":false,"ADD":false,"SUBTRACT":false,"LIGHTEST":false,"DARKEST":false,"DIFFERENCE":false,"EXCLUSION":false,"MULTIPLY":false,"SCREEN":false,"OVERLAY":false,"HARD_LIGHT":false,"SOFT_LIGHT":false,"DODGE":false,"BURN":false,"ALPHA_MASK":false,"RED_MASK":false,"GREEN_MASK":false,"BLUE_MASK":false,"CUSTOM":false,"ORTHOGRAPHIC":false,"PERSPECTIVE":false,"POINT":false,"POINTS":false,"LINE":false,"LINES":false,"TRIANGLE":false,"TRIANGLES":false,"TRIANGLE_STRIP":false,"TRIANGLE_FAN":false,"QUAD":false,"QUADS":false,"QUAD_STRIP":false,"POLYGON":false,"PATH":false,"RECT":false,"ELLIPSE":false,"ARC":false,"SPHERE":false,"BOX":false,"GROUP":false,"PRIMITIVE":false,"GEOMETRY":false,"VERTEX":false,"BEZIER_VERTEX":false,"CURVE_VERTEX":false,"BREAK":false,"CLOSESHAPE":false,"OPEN":false,"CLOSE":false,"CORNER":false,"CORNERS":false,"RADIUS":false,"CENTER_RADIUS":false,"CENTER":false,"DIAMETER":false,"CENTER_DIAMETER":false,"BASELINE":false,"TOP":false,"BOTTOM":false,"NORMAL":false,"NORMALIZED":false,"IMAGE":false,"MODEL":false,"SHAPE":false,"SQUARE":false,"ROUND":false,"PROJECT":false,"MITER":false,"BEVEL":false,"AMBIENT":false,"DIRECTIONAL":false,"SPOT":false,"BACKSPACE":false,"TAB":false,"ENTER":false,"RETURN":false,"ESC":false,"DELETE":false,"CODED":false,"SHIFT":false,"CONTROL":false,"ALT":false,"CAPSLK":false,"PGUP":false,"PGDN":false,"END":false,"HOME":false,"LEFT":false,"UP":false,"RIGHT":false,"DOWN":false,"F1":false,"F2":false,"F3":false,"F4":false,"F5":false,"F6":false,"F7":false,"F8":false,"F9":false,"F10":false,"F11":false,"F12":false,"NUMLK":false,"META":false,"INSERT":false,"ARROW":false,"CROSS":false,"HAND":false,"MOVE":false,"TEXT":false,"WAIT":false,"NOCURSOR":false,"DISABLE_OPENGL_2X_SMOOTH":false,"ENABLE_OPENGL_2X_SMOOTH":false,"ENABLE_OPENGL_4X_SMOOTH":false,"ENABLE_NATIVE_FONTS":false,"DISABLE_DEPTH_TEST":false,"ENABLE_DEPTH_TEST":false,"ENABLE_DEPTH_SORT":false,"DISABLE_DEPTH_SORT":false,"DISABLE_OPENGL_ERROR_REPORT":false,"ENABLE_OPENGL_ERROR_REPORT":false,"ENABLE_ACCURATE_TEXTURES":false,"DISABLE_ACCURATE_TEXTURES":false,"HINT_COUNT":false,"SINCOS_LENGTH":false,"PRECISIONB":false,"PRECISIONF":false,"PREC_MAXVAL":false,"PREC_ALPHA_SHIFT":false,"PREC_RED_SHIFT":false,"NORMAL_MODE_AUTO":false,"NORMAL_MODE_SHAPE":false,"NORMAL_MODE_VERTEX":false,"MAX_LIGHTS":false},
+  rudy: {"left":false,"right":false,"up":false,"down":false,"coloring":false,"setLevel":false,"remainingDots":false}
+};
+
+exports.instrumentSync = function(code, template) {
+  if (! JSLINT(code, {
+    predef: predefs[template] || predefs.run,
+    anon: true,
+    eqeq: true,
+    plusplus: true,
+    newcap: true,
+    unparam: true,
+    sloppy: true,
+    vars: true,
+    white: true,
+    regexp: true,
+    forin: true
+  })) { 
+    console.log("failed to instrument code:", JSLINT.errors);
+    return null; 
+  }
+  var tree = JSLINT.tree;
+  var checkPoints = [];
+  var lines = code.split("\n");
+  function handleNode(node) {
+    if (node instanceof Array) {
+      return node.forEach(handleNode);
+    }
+    if (node.first) {
+      handleNode(node.first);
+    }
+    if (node.second) {
+      handleNode(node.second);
+    }
+    if (node.block) {
+      handleBlock(node.block);
+    }
+  }
+  function getNodeStart(node) {
+    switch(node.arity) {
+      case "infix": case "suffix":
+        return getNodeStart(node.first);
+      default:
+        return {line: node.line, from: node.from};
+    }
+  }
+  function handleBlock(block, skipInsertion) {
+    if (! skipInsertion) {
+      checkPoints.push(getNodeStart(block[0]));
+    }
+    for (var i = block.length-1; i >= 0; --i) {
+      handleNode(block[i]);
+    }
+  }
+  handleBlock(tree.first, true);
+  checkPoints.sort(function(a, b) {
+    return a.line == b.line ? a.line - b.line : a.from - b.from;
+  }).reverse();
+  checkPoints.forEach(function(loc) {
+    var line = loc.line-1; // 1-indexed.
+    var chr  = loc.from-1; // also 1-indexed.
+    var curLine = lines[line];
+    lines[line] = curLine.substr(0, chr)+"__ck("+loc.line+","+loc.from+"); "+curLine.substr(chr);
+  });
+  var newCode = lines.join("\n");
+  return newCode;
+};
+
+exports.instrument = function(code, cb) {
+  
+};

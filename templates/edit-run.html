@@ -1,0 +1,79 @@
+<script type="text/javascript" src="/js/processing-1.3.6.js"></script>
+<script type="text/javascript" src="/js/jslint.js"></script>
+<script type="text/javascript" src="/js/main.js"></script>
+<script type="text/javascript" src="/js/run-wrapper.js"></script>
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+
+<script type="text/javascript">
+  window.Main = Em.Application.create({
+    controller: CodingSupport.CodeController.create({
+      codeTemplate: '<%= template %>',
+      sketchId: '<%= sketchId %>',
+      clientId: '<%= clientId %>',
+      
+      canvasWidth: 360,
+      runtimeErrorHandler: function(errorObject) {
+        this.get('codeMirrorView').markErrors([{
+          line: errorObject.line,
+          character: errorObject.char,
+          reason: errorObject.msg
+        }]);
+      },
+      updateWidth: function(width) {
+        this.set('canvasWidth', width);
+      },
+      canvasWrapperStyle: function() {
+        return "width: "+this.get('canvasWidth')+"px; margin-left: 10px; border: 1px solid #ccc;"
+      }.property('canvasWidth'),
+      codeViewWrapperStyle: function() {
+        return "margin-right: "+(this.get('canvasWidth')+10)+"px;";
+      }.property('canvasWidth')
+    }),
+    ToolbarView: Em.View.extend({
+      play: function() {
+        this.get('controller').play();
+      },
+    })
+  });
+
+  $(function() {
+    document.onkeypress = function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.keyCode == 114) { // Ctrl-R
+        e.preventDefault();
+        window.Main.controller.play();
+      }
+    }
+  });
+</script>
+
+<script type="text/x-handlebars">
+  <div id="toolbar">
+    {{#view Main.ToolbarView controllerBinding="Main.controller"}}
+      <div class="pull-right" style="padding-top: 5px;"><span class="label" {{bindAttr class="statusLabel.c" }}> {{statusLabel.l}}</span></div>
+      <button class="btn btn-primary" {{action "play"}}><i class="icon-play icon-white"></i> Run</button> 
+    {{/view}}
+  </div>
+  <div class="pull-right" {{bindAttr style="Main.controller.canvasWrapperStyle"}}>
+    <canvas id="pjs"></canvas>
+  </div>
+  <div {{bindAttr style="Main.controller.codeViewWrapperStyle"}}>
+    {{#view CodingSupport.CodeMirrorView autoResize=true controllerBinding="Main.controller"}}<%- initialCode %>{{/view}}
+  </div>
+</script>
+
+<script>
+$(function() {
+  var socket = io.connect();
+  socket.on('connect', function() {
+    socket.emit('register', {id: Main.controller.get('clientId')});
+  });
+  socket.on('runtime error', function(data) {
+    console.log("runtime error!", data);
+    Main.controller.get('codeMirrorView').markErrors([
+      { line: data.line, character: data.char, reason: data.msg }
+    ]);
+  });
+});
+</script>
+
+<canvas id="testcanvas" style="display: none;"></canvas>

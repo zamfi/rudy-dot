@@ -1,6 +1,6 @@
-window.Main = Em.Application.create({
-  syntaxChecker: Em.Object.create({
-    codeTemplateBinding: "Main.controller.codeTemplate",
+window.CodingSupport = Em.Namespace.create({
+  SyntaxChecker: Em.Object.extend({
+    codeTemplate: "run",
     predef: null,
     initializePredef: function() {
       if (! this.get('predef')) {
@@ -36,8 +36,8 @@ window.Main = Em.Application.create({
             predef.up = false;
             predef.down = false;
             predef.coloring = false;
-            predef.setLevel = false;
             predef.remainingDots = false;
+            predef.println = false;
             break;
         }
         this.set('predef', predef);
@@ -57,7 +57,8 @@ window.Main = Em.Application.create({
         vars: true,
         white: true,
         regexp: true,
-        forin: true
+        forin: true,
+        sub: true
       });
       if (! pass) {
         return JSLINT.errors;
@@ -65,7 +66,7 @@ window.Main = Em.Application.create({
     }
   }),
   
-  instrumentor: Em.Object.create({
+  CodeInstrumentor: Em.Object.extend({
     instrument: function(code, tree) {
       var checkPoints = [];
       var lines = code.split("\n");
@@ -109,22 +110,86 @@ window.Main = Em.Application.create({
         var curLine = lines[line];
         lines[line] = curLine.substr(0, chr)+"__ck("+loc.line+","+loc.from+"); "+curLine.substr(chr);
       });
-      // console.log(checkPoints);
       var newCode = lines.join("\n");
-      // console.log(newCode);
       return newCode;
-    },
-    test: function() {
-      var code = Main.controller.getCode();
-      Main.controller.validate(code);
-      console.log(this.instrument(code, JSLINT.tree));
     }
+    // test: function() {
+    //   var code = Main.controller.getCode();
+    //   Main.controller.validate(code);
+    //   console.log(this.instrument(code, JSLINT.tree));
+    // }
   }),
   
-  errorController: Em.Object.create({
-    markedLines: [],
+  CodeMirrorView: Em.View.extend({
+    shareDocName: null,
+    shareDoc: null,
+    autoResize: false,
+    status: 'off',
+    didInsertElement: function() {
+      this._super();
+      var initialCode = this.$().text();
+      this.$().html('<textarea>'+initialCode+'</textarea>');
+
+      var self = this;
+      var codeArea = CodeMirror.fromTextArea(this.$('textarea')[0], {
+        mode: "javascript",
+        tabSize: 2,
+        lineNumbers: true,
+        indentWithTabs: false,
+        // extraKeys: { "Tab": "IndentAuto" },
+        onChange: function() {
+          if (self.get('controller').noteCodeChange) {
+            self.get('controller').noteCodeChange();
+          }
+        }
+      });
+      this.set('codeArea', codeArea);
+
+      if (this.get('autoResize')) {
+        CodeMirror.connect(window, 'resize', function() { self.resizeCodeMirror(); });
+        this.resizeCodeMirror();        
+      }
+      
+      this.set('markedLines', []); // don't share this across instances.
+      if (this.get('controller')) {
+        this.set('controller.codeMirrorView', this);
+      }
+      
+      if (this.get('shareDocName')) {
+        var self = this;
+        this.set('shareConnection', sharejs.open(this.get('shareDocName'), "text", function(error, newDoc) {
+          if (self.get('shareDoc')) {
+            var oldDoc = self.get('shareDoc');
+            oldDoc.close();
+            oldDoc.detach_cm();
+          }
+          if (error) {
+            console.log("Failed to connect to server...");
+          }
+          self.set('shareDoc', newDoc);
+          newDoc.attach_cm(self.get('codeArea'), true);
+        }));
+        var connection = this.get('shareConnection');
+        connection.on('ok', function() {self.set('status', 'success')});
+        connection.on('connecting', function() {self.set('status', 'connecting')});
+        connection.on('disconnected', function() {self.set('status', 'disconnected')});
+        connection.on('stopped', function() {self.set('status', 'stopped')});
+      }
+    },
+    
+    resizeCodeMirror: function() {
+      var codeArea = this.get('codeArea');
+      var winHeight = window.innerHeight || (document.documentElement || document.body).clientHeight;
+      codeArea.getScrollerElement().style.height = (winHeight - 60) + " px";
+      codeArea.refresh();
+    },
+    
+    initialCode: "// Your code here.",
+    defaultTemplate: Em.Handlebars.compile("{{{initialCode}}}"),
+
+    markedLines: null,
     clearErrors: function() {
-      $('.errorbox').remove();
+      this.$('.errorbox').remove();
       var codeArea = this.get('codeArea')
       this.get('markedLines').forEach(function(lineHandle) {
         codeArea.setLineClass(lineHandle, null, null);
@@ -132,7 +197,7 @@ window.Main = Em.Application.create({
       });
       this.set('markedLines', []);
     },
-    markErrors: function(errors) {
+    markErrors: function(errors, suppressBoxes) {
       var codeArea = this.get('codeArea');
       var markedLines = this.get('markedLines');
       var stopped = false;
@@ -148,7 +213,7 @@ window.Main = Em.Application.create({
         var lineHandle = codeArea.setMarker(error.line-1, '%N%', 'gutter-warning');
         codeArea.setLineClass(lineHandle, null, 'line-warning');
         markedLines.push(lineHandle);
-        return this.showErrorBox(error.line-1, error.character-1||1, error.reason);
+        return suppressBoxes ? Em.K : this.showErrorBox(error.line-1, error.character-1||1, error.reason);
       }, this);
       
       boxes.reverse().forEach(function(box) {
@@ -170,22 +235,24 @@ window.Main = Em.Application.create({
         codeArea.addWidget({line: line, ch: character}, box[0], true);        
       };
     },
-    codeAreaBinding: "Main.controller.codeArea"
+    controller: null
   }),
   
-  controller: Em.Object.create({
-    validate: function(code) {
-      Main.errorController.clearErrors();
-      var errors = Main.syntaxChecker.check(code);
+  CodeController: Em.Object.extend({
+    validate: function(code, suppressBoxes) {
+      this.get('codeMirrorView').clearErrors();
+      var errors = this.get('syntaxChecker').check(code);
       if (errors) {
         $.ajax('/noteError', {
           type: 'post',
           data: {
+            clientId: this.get('clientId'),
+            sketchId: this.get('sketchId'),
             code: code,
             errors: JSON.stringify(errors)
           }
         });
-        Main.errorController.markErrors(errors);
+        this.get('codeMirrorView').markErrors(errors, suppressBoxes);
       }
       return ! errors;
     },
@@ -193,19 +260,20 @@ window.Main = Em.Application.create({
       return this.get('codeArea').getValue();
     },
     
-    codeArea: null,
+    extra: null,
+    
+    codeAreaBinding: "codeMirrorView.codeArea",
     codeTemplate: 'run',
     sketchId: null,
-    doSave: function(randomId, code, instrumentedCode, pushVersion, cb) {
+    doSave: function(code, saveVersion, cb) {
       var data = {
         code: code,
-        pushVersion: pushVersion
+        clientId: this.get('clientId'),
+        template: this.get('codeTemplate'),
+        saveVersion: saveVersion
       };
-      if (instrumentedCode) {
-        data.instrumentedCode = instrumentedCode;
-      }
-      if (randomId) {
-        data.id = randomId;
+      if (this.get('extra')) {
+        data.extra = this.get('extra');
       }
       $.ajax('/save/'+this.get('sketchId'), {
         type: 'post',
@@ -224,80 +292,115 @@ window.Main = Em.Application.create({
       });      
     }, 
     play: function() {
-      var randomId = Math.round(Math.random()*10000000000);
-      var code = this.get('codeArea').getValue();
+      // var randomId = ""+Math.round(Math.random()*10000000000);
+      var sketchId = this.get('sketchId');
+      var clientId = this.get('clientId');
+      var code = this.getCode();
       if (! this.validate(code)) {
         return;
       }
-      var instrumentedCode = Main.instrumentor.instrument(code, JSLINT.tree);
-      this.doSave(randomId, code, instrumentedCode, true);
-      window.open('/'+this.get('codeTemplate')+'/'+sketchId+'/'+randomId, 'rudy-'+this.get('codeTemplate'));
-    },
-    
-    status: function() {
-      return this.get('saveTimeout') ? 'icon-refresh' : 'icon-ok';
-    }.property('saveTimeout'),
-    statusTitle: function() {
-      return this.get('saveTimeout') ? 'saving...' : 'saved';
-    }.property('saveTimeout'),
-    
-    saveTimeout: null,
-    lastChange: new Date(),
-    timeoutFunction: function() {
-      var savedChange = this.get('lastChange');
+      var instrumentedCode = this.get('instrumentor').instrument(code, JSLINT.tree); // JSLINT.tree is set in this.validate.
+      this.doSave(code, true);
       var self = this;
-      this.doSave(null, this.get('codeArea').getValue(), null, false, function(ok) {
-        if (self.get('lastChange') > savedChange) {
-          self.set('saveTimeout', setTimeout(function() { self.timeoutFunction() }, 1000));
-        } else {
-          if (ok) {
-            self.set('saveTimeout', null);
-          } else {
-            self.set('saveTimeout', setTimeout(function() { self.timeoutFunction() }, 1000));
-          }
-        }
-      });
+      window.ProcessingWrapper.executeCode(instrumentedCode, this);
+      // console.log("new window with", sketchId, clientId, randomId);
+      // window.open('/play/'+[this.get('codeTemplate'), sketchId, clientId, randomId].join('/'), 'rudy-'+this.get('codeTemplate'));
     },
+    
+    changeSaveTimeout: null,
+    changeSaveState: 'saved',
     noteCodeChange: function() {
-      this.set('lastChange', new Date());
-      if (! this.get('saveTimeout')) {
-        if (! this.get('saveTimeout')) {
-          var self = this;
-          this.set('saveTimeout', setTimeout(function() { self.timeoutFunction() }, 1000));
-        }
+      var controller = this;
+      switch (this.get('changeSaveState')) {
+        case 'saved':
+          this.set('changeSaveState', 'waiting');
+          this.set('changeSaveTimeout', setTimeout(function() {
+            controller.saveChangeTimeoutTriggered();
+          }, 500));
+          break;
+        case 'saving':
+          this.set('changeSaveState', 'dirty');
+          break;
+        case 'dirty':
+        case 'waiting':
+          // nothing to do.
+        default:
+          break;
       }
     },
-
-    resizeCodeMirror: function() {
-      var codeArea = this.get('codeArea');
-      var winHeight = window.innerHeight || (document.documentElement || document.body).clientHeight;
-      codeArea.getScrollerElement().style.height = (winHeight - 60) + " px";
-      codeArea.refresh();
+    saveChangeTimeoutTriggered: function() {
+      var controller = this;
+      switch (this.get('changeSaveState')) {
+        case 'waiting':
+          this.set('changeSaveTimeout', null);
+          this.doSave(this.getCode(), false, function(ok) {
+            controller.saveChangeAjaxCompleted(ok);
+          });
+          this.set('changeSaveState', 'saving');
+          break;
+        case 'saving':
+        case 'dirty':
+          console.log("unacceptable saveChangeTimeoutTriggered call in state", this.get('changeSaveState'));
+        case 'saved':
+          // nothing to do.
+        default:
+          break;
+      }
+    },
+    saveChangeAjaxCompleted: function(status) {
+      var controller = this;
+      switch (this.get('changeSaveState')) {
+        case 'saving':
+          if (status) {
+            this.set('changeSaveState', 'saved');
+            break;            
+          }
+        case 'dirty':
+          this.set('changeSaveState', 'waiting');
+          this.set('changeSaveTimeout', setTimeout(function() {
+            controller.saveChangeTimeoutTriggered();
+          }, 500));
+          break;
+        case 'waiting':
+        case 'saved':
+          console.log("unacceptable saveChangeAjaxCompleted call in state", this.get('changeSaveState'));
+        default:
+          break;
+      }
     },
     
-    createCodeArea: function() {
-      var self = this;
-      var codeArea = CodeMirror.fromTextArea($('#editor')[0], {
-        mode: "javascript",
-        tabSize: 2,
-        lineNumbers: true,
-        onChange: function() {
-          self.noteCodeChange();
-        }
-      });
-      this.set('codeArea', codeArea);
-      CodeMirror.connect(window, 'resize', function() { self.resizeCodeMirror(); });
-      this.resizeCodeMirror();
+    statusLabel: function() {
+      switch (this.get('codeMirrorView.status')) {
+        case 'success':
+          return {c: "label-success", l: "Connected"};
+        case 'connecting':
+          return {c: "label-warning", l: "Connecting..."};
+        case 'disconnected':
+        case 'stopped':
+          return {c: "label-danger", l: "Disconnected"};
+        case 'off':
+          switch (this.get('changeSaveState')) {
+            case 'saved':
+              return {c: "label-success", l: "Saved"};
+            case 'dirty':
+            case 'waiting':
+            case 'saving':
+            default:
+              return {c: "", l: "Saving..."};
+          }
+        default:
+          return {c: "label-warning", l: "???"};
+      }
+    }.property('codeMirrorView.status', 'changeSaveState'),
+    
+    init: function() {
+      this._super();
+      this.set('syntaxChecker', CodingSupport.SyntaxChecker.create({codeTemplate: this.get('codeTemplate')}));
+      this.set('instrumentor', CodingSupport.CodeInstrumentor.create());
+      var controller = this;
+      if (controller.showInitialState) {
+        setTimeout(function() {controller.showInitialState()}, 250);        
+      }
     }
   })
-});
-
-$(function() {
-  document.onkeypress = function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.keyCode == 114) { // Ctrl-R
-      e.preventDefault();
-      window.Main.controller.play();
-    }
-  }
-  window.Main.controller.createCodeArea();
 });

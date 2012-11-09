@@ -7,7 +7,7 @@
 <canvas id="pjs"></canvas>
 
 <script type="text/javascript">
-var sketchId = "<%= sketchId %>";
+var clientId = <%- clientId ? '"'+clientId+'"' : null %>;
 function sketchProc(processing) {
   var TIMEOUT = 5*1000;
   if (! window.__ck) {
@@ -22,16 +22,18 @@ function sketchProc(processing) {
       var now = +new Date();
       if (now - window.__ck_lastrun > TIMEOUT) {
         processing.println("Line "+line+", character "+char+": Execution exceeded "+Math.round(TIMEOUT/1000)+" seconds...perhaps you have an infinite loop?");
-        $.ajax({
-          type: 'post',
-          url: '/runtimeError',
-          data: {
-            id: sketchId,
-            line: line,
-            char: char,
-            msg: "Execution timed out."
-          }
-        });
+        if (clientId) {
+          $.ajax({
+            type: 'post',
+            url: '/runtimeError',
+            data: {
+              id: clientId,
+              line: line,
+              char: char,
+              msg: "Execution timed out."
+            }
+          });
+        }
         throw new Error("Execution timed out.");
       }
     }

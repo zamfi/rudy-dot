@@ -2056,7 +2056,7 @@ var CodeMirror = (function() {
   keyMap.basic = {
     "Left": "goCharLeft", "Right": "goCharRight", "Up": "goLineUp", "Down": "goLineDown",
     "End": "goLineEnd", "Home": "goLineStartSmart", "PageUp": "goPageUp", "PageDown": "goPageDown",
-    "Delete": "delCharRight", "Backspace": "delCharLeft", "Tab": "defaultTab", "Shift-Tab": "indentAuto",
+    "Delete": "delCharRight", "Backspace": "delCharLeft", "Tab": "indentAuto", "Shift-Tab": "indentAuto",
     "Enter": "newlineAndIndent", "Insert": "toggleOverwrite"
   };
   // Note that the save and find-related commands aren't defined by

@@ -10,25 +10,41 @@ exports.init = function(cb) {
   });
 }
 
-exports.update = function(id, obj, cb) {
-  client.collection('sketches', function(err, collection) {
+function curry(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return function() {
+    return fn.apply(this, args.concat(Array.prototype.slice.call(arguments)));
+  };
+}
+
+exports.in = function(collectionName) {
+  return {
+    update: curry(exports.update, collectionName),
+    create: curry(exports.create, collectionName),
+    get: curry(exports.get, collectionName),
+    all: curry(exports.all, collectionName)
+  }
+}
+
+exports.update = function(collectionName, id, obj, cb) {
+  client.collection(collectionName, function(err, collection) {
     if (err) {
       log("failed to update", err);
       return cb(err);
     }
-    collection.update({_id: new mongodb.ObjectID(id)}, obj, {upsert: true}, function(err, docs) {
+    collection.update({_id: new mongodb.ObjectID(id)}, obj, {upsert: true}, function(err, count) {
       if (err) {
         log("failed to update (2)", err);
         return cb(err);
       }
       log("saved.");
-      cb(null, docs);
+      cb(null, count);
     });
   })
 }
 
-exports.create = function(obj, cb) {
-  client.collection('sketches', function(err, collection) {
+exports.create = function(collectionName, obj, cb) {
+  client.collection(collectionName, function(err, collection) {
     if (err) {
       log("failed to create", err);
       return cb(err);
@@ -44,8 +60,8 @@ exports.create = function(obj, cb) {
   });
 }
 
-exports.get = function(id, cb) {
-  client.collection('sketches', function(err, collection) {
+exports.get = function(collectionName, id, cb) {
+  client.collection(collectionName, function(err, collection) {
     if (err) {
       log("failed to read", err);
       return cb(err);
@@ -61,8 +77,8 @@ exports.get = function(id, cb) {
   });
 }
 
-exports.all = function(cb) {
-  client.collection('sketches', function(err, collection) {
+exports.all = function(collectionName, cb) {
+  client.collection(collectionName, function(err, collection) {
     if (err) {
       log("failed to read", err);
       return cb(err);
