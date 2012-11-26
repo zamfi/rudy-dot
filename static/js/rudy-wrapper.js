@@ -36,7 +36,19 @@
 
       with (processing) {
         var runUserCode = function() {
-          eval(userCode);
+          // eval(userCode);
+          var interpreter = window.JSEvaluator.Interpreter.create({
+            builtIns: {
+              right: right,
+              down: down,
+              up: up,
+              left: left,
+              coloring: coloring,
+              remainingDots: remainingDots,
+              __ck: window.__ck
+            }
+          });
+          interpreter.interpret(userCode);
         }
  
         // ROBOT CODE
@@ -237,6 +249,10 @@
             addCommand('down');
         }
  
+        var GRIDWIDTH=30;
+        var MARGIN=20;
+        var CELLROWS = 10;
+        var CELLCOLS = 10;
         var applyCommand = function(command) {
             var np = null;
             switch(command) {
@@ -255,15 +271,15 @@
                 default:
                     println("unknown command: "+command);
             }
-            if (np && ! sim.levels[sim.level].obstacles.contains(np.x, np.y)) {
-                return np;
-            } else {
+            if ((! np) || 
+                sim.levels[sim.level].obstacles.contains(np.x, np.y) ||
+                np.x < 0 || np.y < 0 || np.x > (CELLCOLS-1) || np.y > (CELLROWS-1)) {
                 return false;
+            } else {
+                return np;
             }
         }
  
-        var GRIDWIDTH=30;
-        var MARGIN=20;
         var makeObstacles = function(x, y, width, height) {
             var out = [];
             for (var i = 0; i < width; ++i) {
@@ -418,10 +434,10 @@
             text("Green dots remaining: "+trashFound, 20, 10);
  
             stroke(204);
-            for (var i = 0; i <= (width-MARGIN/2)/GRIDWIDTH; ++i) {
+            for (var i = 0; i <= CELLCOLS+1; ++i) {
                 line(MARGIN+i*GRIDWIDTH, MARGIN, MARGIN+i*GRIDWIDTH, height-MARGIN);
             }
-            for (var i = 0; i <= (height-MARGIN*2)/GRIDWIDTH; ++i) {
+            for (var i = 0; i <= CELLROWS+1; ++i) {
                 line(MARGIN, MARGIN+i*GRIDWIDTH, width-MARGIN, i*GRIDWIDTH+MARGIN);
             }
             noStroke();
