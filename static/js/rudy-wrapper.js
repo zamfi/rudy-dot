@@ -44,11 +44,26 @@
               up: up,
               left: left,
               coloring: coloring,
-              remainingDots: remainingDots,
-              __ck: window.__ck
+              remainingDots: remainingDots
             }
           });
-          interpreter.interpret(userCode);
+          try {
+            interpreter.interpret(userCode);            
+          } catch (e) {
+            if (e.errorType == "timeout") {
+              runtimeErrorHandler({
+                line: e.startPos.line+1, char: e.startPos.col,
+                msg: "Execution timed out."
+              });
+            } else {
+              console.log(e);
+              runtimeErrorHandler({
+                line: 0, char: 0,
+                msg: "Runtime error: "+e.getMessage()
+              });
+            }
+          }
+          // var sim = interpreter.getSimulation();
         }
  
         // ROBOT CODE
