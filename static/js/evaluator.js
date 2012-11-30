@@ -311,7 +311,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
     this.assert(parserNode.children[0]._text, 'var');
     parserNode.children.forEach(function(node) {
       if (node.name == 'varDecl') {
-        scope.declareValue(node.children[0]._text, this.evaluate(node.children[2], scope));
+        scope.declareValue(node.children[0]._text, node.children.length == 2 ? this.evaluate(node.children[2], scope) : undefined);
       }
     }, this);
     return undefined;
