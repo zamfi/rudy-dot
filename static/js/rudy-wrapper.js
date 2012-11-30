@@ -59,7 +59,7 @@
               console.log(e);
               runtimeErrorHandler({
                 line: 0, char: 0,
-                msg: "Runtime error: "+e.getMessage()
+                msg: "Runtime error: "+(e ? e.getMessage() : "(unknown)")
               });
             }
           }
