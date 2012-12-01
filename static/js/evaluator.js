@@ -1,5 +1,27 @@
 window.JSEvaluator = Em.Namespace.create({});
 
+JSEvaluator.Util = Em.Object.create({
+  asyncForEach: function(arr, each_cb, done_cb, thisPtr) {
+    var i = 0;
+
+    function doNextCb(err, val) {
+      if (err) {
+        return done_cb.call(thisPtr, err);
+      }
+      i += 1;
+      if (i >= arr.length) {
+        return done_cb.call(thisPtr, null, val);
+      }
+      each_cb.call(thisPtr, arr[i], i, doNextCb);
+    }
+    if (arr.length > 0) {
+      each_cb.call(thisPtr, arr[i], i, doNextCb);
+    } else {
+      done_cb.call(thisPtr, null, undefined);
+    }
+  }
+});
+
 JSEvaluator.Scope = Em.Object.extend({
   interpreter: function() {
     return this.get('parent.interpreter');
@@ -28,7 +50,6 @@ JSEvaluator.Scope = Em.Object.extend({
       if (typeof(val) == 'function') {
         // console.log("...it's a function.");
         val = interpreter.wrapExternalFunction(val, name);
-        
       } else if (typeof(val) == 'object') {
         val = interpreter.newObject(val);
       }
@@ -79,14 +100,14 @@ JSEvaluator.Function = JSEvaluator.Object.extend({
   bodyNodes: Em.required(),
   argumentNames: Em.required(),
     
-  call: function(thisPtr, args) {
+  call: function(thisPtr, args, cb) {
     var scope = this.get('declarationScope').subScope();
     scope.declareValue('this', thisPtr);
     var argNames = this.get('argumentNames');
     for (var i = 0; i < Math.min(args.length, argNames.length); ++i) {
       scope.declareValue(argNames[i], args[i]);
     }
-    return this.get('declarationScope.interpreter').evaluateBlock(this.get('bodyNodes'), scope)
+    this.get('declarationScope.interpreter').evaluateBlock(this.get('bodyNodes'), scope, cb);
   },
   init: function() {
     this._super();
@@ -106,10 +127,14 @@ JSEvaluator.Interpreter = Em.Object.extend({
     return JSEvaluator.Function.create({
       id: this.incrementProperty('nextObjectId'),
       name: name,
-      call: function(thisPtr, args) {
-        var ret = f.apply(thisPtr, args);
-        console.log("calling external function", name, "with args", args, "returning", ret);
-        return ret;
+      call: function(thisPtr, args, cb) {
+        try {
+          var ret = f.apply(thisPtr, args);
+          // console.log("calling external function", name, "with args", args, "returning", ret);
+          cb(null, ret);
+        } catch (e) {
+          cb(e);
+        }
       }
     });
   },
@@ -147,293 +172,503 @@ JSEvaluator.Interpreter = Em.Object.extend({
       underlying: underlying
     });
   },
-  evaluateExpression: function(parserNode, scope) {
+  evaluateExpression: function(parserNode, scope, cb) {
     var c = parserNode.children;
     this.assert(c[1]._text, ';')
-    return this.evaluate(c[0], scope);
+    this.evaluate(c[0], scope, cb);
   },
-  getBaseAndKey: function(parserNode, scope) {
+  getBaseAndKey: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var bk;
     switch (parserNode.name) {
       case 'dot':
         var baseNode = c[0];
-        this.assert(c[1]._text, '.');
-        var key = c[2]._text;
-        bk = {base: this.evaluate(baseNode, scope), key: key};
+        this.assert(c[1].text(), '.');
+        var key = c[2].text();
+        this.evaluate(baseNode, scope, function(err, baseVal) {
+          if (err) { return cb(err); }
+          if (typeof(baseVal) !== 'object') {
+            return cb(new Error("'"+baseVal+"' is not an object"));
+          }
+          cb(null, {
+            base: baseVal,
+            key: key,
+            value: val.retrieve(key)
+          });
+        });
         break;
       case 'bracket':
         var baseNode = c[0];
-        this.assert(c[1]._text, '[');
+        this.assert(c[1].text(), '[');
         var key = c[2];
-        this.assert(c[3]._text, ']');
-        bk = {base: this.evaluate(baseNode, scope), key: this.evaluate(key, scope)};
+        this.assert(c[3].text(), ']');
+        this.evaluate(baseNode, scope, function(err, baseVal) {
+          if (err) { return cb(err); }
+          if (typeof(baseVal) !== 'object') {
+            return cb(new Error("'"+baseVal+"' is not an object"));
+          }
+          this.evaluate(key, scope, function(err, keyVal) {
+            if (err) { return cb(err); }
+            cb(null, {
+              base: baseVal, 
+              key: keyVal,
+              value: baseVal.retrieve(keyVal)
+            });
+          })
+        });
         break;
       default:
-        throw new Error("Unknown node type "+parserNode.name+" to get base and key from.");
+        cb(new Error("Unknown node type "+parserNode.name+" to get base and key from."));
     }
-    if (typeof(bk.base) != 'object') {
-      throw new Error("'"+bk.base+"' is not an object");
-    }
-    bk.value = bk.base.retrieve(bk.key);
-    return bk;
   },
-  evaluateCall: function(parserNode, scope) {
+  evaluateCall: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var functionNode = c[0];
-    var thisPtr = null;
-    var f;
     switch (functionNode.name) {
       case 'dot':
       case 'bracket':
-        var bk = this.getBaseAndKey(functionNode, scope);
-        thisPtr = bk.base;
-        f = bk.value;
+        this.getBaseAndKey(functionNode, scope, function(err, bk) {
+          if (err) { return cb(err); }
+          withFunction.call(this, bk.base, bk.value);
+        });
         break;
       case 'identifier':
-        f = this.evaluate(functionNode, scope);
+        this.evaluate(functionNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          withFunction.call(this, null, val);
+        });
         break;
       default:
-        throw new Error("not sure how to call functionNode"+functionNode.name);
+        cb(new Error("not sure how to call functionNode"+functionNode.name));
     }
-
-    this.assert(c[1]._text, '(');
-    var i = 2;
-    var args = [];
-    while (c[i]._text != ')') {
-      args.push(c[i]);
-      if (c[i+1]._text == ',') {
-        i += 2;
-      } else {
-        i++;
+    function withFunction(thisPtr, f) {
+      this.assert(c[1].text(), '(');
+      var i = 2;
+      var args = [];
+      while (c[i]._text != ')') {
+        args.push(c[i]);
+        if (c[i+1].text() == ',') {
+          i += 2;
+        } else {
+          i++;
+        }
       }
-    }
-    args = args.map(function(argNode) {
-      return this.evaluate(argNode, scope);
-    }, this);
-
-    return f.call(thisPtr, args);        
+      var evaluatedArgs = [];
+      JSEvaluator.Util.asyncForEach(args, function(argNode, index, cb) {
+        // console.log("evaluating arg at index", index);
+        this.evaluate(argNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          // console.log("...is", val);
+          evaluatedArgs[index] = val;
+          cb();
+        });
+      }, function(err, val) {
+        if (err) { return cb(err); }
+        // console.log("now calling function", f.get('name'));
+        f.call(thisPtr, evaluatedArgs, cb);
+      }, this);
+    }    
   },
-  evaluateDot: function(parserNode, scope) {
-    return this.getBaseAndKey(parserNode, scope).value;
+  evaluateDot: function(parserNode, scope, cb) {
+    this.getBaseAndKey(parserNode, scope, function(err, bk) {
+      if (err) {
+        return cb(err);
+      }
+      cb(null, bk.value);
+    });
   },
-  evaluateBracket: function(parserNode, scope) {
-    return this.getBaseAndKey(parserNode, scope).value;
+  // same as Dot I suppose.
+  evaluateBracket: function(parserNode, scope, cb) {
+    this.getBaseAndKey(parserNode, scope, function(err, bk) {
+      if (err) {
+        return cb(err);
+      }
+      cb(null, bk.value);
+    });
   },
-  evaluateBinary: function(parserNode, scope) {
+  evaluateBinary: function(parserNode, scope, cb) {
     var self = this;
     var c = parserNode.children;
-    // LHS and RHS are functions so we can rely on javascript's existing behavior when it comes to
-    // whether to actually evaluate the LHS and RHS (for || and &&)
-    var lhs = function() { return self.evaluate(c[0], scope); };
-    var rhs = function() { return self.evaluate(c[2], scope); };
     // this.assert(c[1]._type, 'PUNCTUATION'); // could be PUNCTUATION or KEYWORD.
     var op = c[1]._text;
-    switch (op) {
-      case '+':
-        return lhs() + rhs();
-      case '-':
-        return lhs() - rhs();
-      case '*':
-        return lhs() * rhs();
-      case '/':
-        return lhs() / rhs();
-      case '%':
-        return lhs() % rhs();
-      case '<':
-        return lhs() < rhs();
-      case '>': 
-        return lhs() > rhs();
-      case '==':
-        return lhs() == rhs();
-      case '===':
-        return lhs() === rhs();
-      case '!=':
-        return lhs() != rhs();
-      case '!==':
-        return lhs() !== rhs();
-      case '<=':
-        return lhs() <= rhs();
-      case '>=':
-        return lhs() >= rhs();
-      case '&&':
-        return lhs() && rhs();
-      case '||':
-        return lhs() || rhs();
-      case 'instanceof':
-        return lhs() instanceof rhs();
-      default:
-        throw new Error('Unknown operator: '+op);
-    }      
+    this.evaluate.call(this, c[0], scope, function(err, lhs) {
+      switch (op) {
+        case '+':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs + rhs);
+          });
+          break;
+        case '-':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs - rhs);
+          });
+          break;
+        case '*':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs * rhs);
+          });
+          break;
+        case '/':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs / rhs);
+          });
+          break;
+        case '%':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs % rhs);
+          });
+          break;
+        case '<':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs < rhs);
+          });
+          break;
+        case '>': 
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs > rhs);
+          });
+          break;
+        case '==':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs == rhs);
+          });
+          break;
+        case '===':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs === rhs);
+          });
+          break;
+        case '!=':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs != rhs);
+          });
+          break;
+        case '!==':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs !== rhs);
+          });
+          break;
+        case '<=':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs <= rhs);
+          });
+          break;
+        case '>=':
+          this.evaluate.call(this, c[2], scope, function(err, rhs) {
+            if (err) { return cb(err); }
+            cb(null, lhs >= rhs);
+          });
+          break;
+        case '&&':
+          if (lhs) {
+            this.evaluate.call(this, c[2], scope, function(err, rhs) {
+              if (err) { return cb(err); }
+              cb(null, lhs && rhs);
+            });
+          } else {
+            cb(null, lhs);
+          }
+          break;
+        case '||':
+          if (lhs) {
+            cb(null, lhs);
+          } else {
+            this.evaluate.call(this, c[2], scope, function(err, rhs) {
+              if (err) { return cb(err); }
+              cb(null, lhs || rhs);
+            });            
+          }
+          break;
+        default:
+          cb(new Error('Unknown operator: '+op));
+      }      
+    });
   },
-  evaluateObject: function(parserNode, scope) {
+  evaluateObject: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var object = {};
     this.assert(c[0]._text, '{');
     this.assert(c[c.length-1]._text, '}');
-    c.forEach(function(n) {
+    JSEvaluator.Util.asyncForEach(c, function(n, i, cb) {
       if (n.name != 'prop') { return; }
       var pc = n.children;
       this.assert(pc[1]._text, ':');
       var n = pc[0];
       switch (n.name) {
         case 'idPropName':
-          object[n.children[0]._text] = this.evaluate(pc[2], scope);
+          this.evaluate(pc[2], scope, function(err, val) {
+            if (err) { return cb(err); }
+            object[n.children[0]._text] = val;
+            cb();            
+          });
           break;
         case 'strPropName':
         case 'numPropName':
-          // eval the string or number text to get an actual string or number
-          object[eval(n.children[0]._text)] = this.evaluate(pc[2], scope);
+          this.evaluate(pc[2], scope, function(err, val) {
+            if (err) { return cb(err); }
+            // eval the string or number text to get an actual string or number
+            object[eval(n.children[0]._text)] = val;
+            cb();
+          });
           break;
         default:
-          throw new Error("unknown property identifier type: "+n.name);
-      }
+          cb(new Error("unknown property identifier type: "+n.name));
+      }      
+    }, function(err, val) {
+      if (err) { return cb(err); }
+      cb(null, this.newObject(object));
     }, this);
-    return this.newObject(object);
   },
-  evaluateArray: function(parserNode, scope) {
+  evaluateArray: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var arr = [];
     this.assert(c[0]._text, '[');
     this.assert(c[c.length-1]._text, ']');
     var i = 1;
     while (c[i]._text != ']') {
-      arr.push(this.evaluate(c[i], scope));
+      arr.push(c[i]);
       if (c[i+1]._text == ',') {
         i += 2;
       } else {
         i++;
       }
     }
-    return this.newObject(arr);
-  },
-  evaluateVar: function(parserNode, scope) {
-    this.assert(parserNode.children[0]._text, 'var');
-    parserNode.children.forEach(function(node) {
-      if (node.name == 'varDecl') {
-        scope.declareValue(node.children[0]._text, node.children.length == 2 ? this.evaluate(node.children[2], scope) : undefined);
-      }
+    var evaluatedArgs = [];
+    JSEvaluator.Util.asyncForEach(arr, function(n, i, cb) {
+      this.evaluate(n, scope, function(err, val) {
+        if (err) { return cb(err); }
+        evaluatedArgs.push(val);
+        cb();
+      });
+    }, function(err, val) {
+      if (err) { return cb(err); }
+      cb(null, this.newObject(evaluatedArgs));
     }, this);
-    return undefined;
   },
-  evaluateAssignment: function(parserNode, scope) {
+  evaluateVar: function(parserNode, scope, cb) {
+    this.assert(parserNode.children[0]._text, 'var');
+    JSEvaluator.Util.asyncForEach(parserNode.children, function(node, i, cb) {
+      if (node.name == 'varDecl') {
+        if (node.children.length == 2) {
+          this.evaluate(node.children[2], scope, function(err, val) {
+            if (err) { return cb(err); }
+            scope.declareValue(node.children[0].text(), val);
+            cb();
+          });
+        } else {
+          scope.declareValue(node.children[0].text(), undefined);
+          cb();
+        }
+      } else {
+        cb();
+      }      
+    }, function(err, val) {
+      cb(err);
+    }, this);
+  },
+  evaluateAssignment: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var op = c[1]._text;
     switch (c[0].name) {
       case 'identifier':
         switch (op) {
           case '=':
-            return scope.updateValue(c[0].children[0]._text, this.evaluate(c[2], scope));
+            this.evaluate(c[2], scope, function(err, val) {
+              if (err) { return cb(err); }
+              scope.updateValue(c[0].children[0].text(), val);
+              cb(null, val);
+            });
+            break;
           case '+=':
-            var oldValue = scope.getValue(c[0].children[0]._text);
-            return scope.updateValue(c[0].children[0]._text, oldValue + this.evaluate(c[2], scope));
+            var oldValue = scope.getValue(c[0].children[0].text());
+            this.evaluate(c[2], scope, function(err, val) {
+              if (err) { return cb(err); }
+              scope.updateValue(c[0].children[0]._text, oldValue + val);
+              cb(null, oldValue + val);
+            });
+            break;
           case '-=':
-            var oldValue = scope.getValue(c[0].children[0]._text);
-            return scope.updateValue(c[0].children[0]._text, oldValue - this.evaluate(c[2], scope));
+            var oldValue = scope.getValue(c[0].children[0].text());
+            this.evaluate(c[2], scope, function(err, val) {
+              if (err) { return cb(err); }
+              scope.updateValue(c[0].children[0]._text, oldValue - val);
+              cb(null, oldValue + val);
+            });
+            break;
           default:
-            throw new Error("unknown operator: "+op);
+            cb(new Error("unknown operator: "+op));
         }
+        break;
       case 'dot':
       case 'bracket':
-        var bk = this.getBaseAndKey(c[0], scope);
-        switch (op) {
-          case '=':
-            return bk.base.assign(bk.key, this.evaluate(c[2], scope));
-          case '+=':
-            return bk.base.assign(bk.key, bk.value + this.evaluate(c[2], scope));
-          case '-=':
-            return bk.base.assign(bk.key, bk.value - this.evaluate(c[2], scope));
-          default:
-            throw new Error("unknown operator: "+op);
-        }
+        this.getBaseAndKey(c[0], scope, function(err, bk) {
+          if (err) { return cb(err); }
+          switch (op) {
+            case '=':
+              this.evaluate(c[2], scope, function(err, val) {
+                if (err) { return cb(err); }
+                bk.base.assign(bk.key, val);
+                cb(null, val);
+              });
+              break;
+            case '+=':
+              this.evaluate(c[2], scope, function(err, val) {
+                if (err) { return cb(err); }
+                bk.base.assign(bk.key, bk.value + val);
+                cb(null, val);
+              });
+              break;
+            case '-=':
+              this.evaluate(c[2], scope, function(err, val) {
+                if (err) { return cb(err); }
+                bk.base.assign(bk.key, bk.value - val);
+                cb(null, val);
+              });
+              break;
+            default:
+              cb(new Error("unknown operator: "+op));
+          }          
+        });
       default:
-        throw new Error("Unknown assignee node: "+c[0]);
+        cb(new Error("Unknown assignee node: "+c[0]));
     }
   },
-  evaluateIf: function(parserNode, scope) {
+  evaluateIf: function(parserNode, scope, cb) {
     var c = parserNode.children;
-    this.assert(c[0]._text, 'if');
-    var condition = this.evaluate(c[2], scope);
-    var consequentNode = c[4];
-    var alternateNode = null;
-    if (c.length > 6 && c[5]._text == 'else') {
-      alternateNode = c[6];
-    }
-    if (condition) {
-      this.evaluate(consequentNode, scope);
-    } else if (alternateNode) {
-      this.evaluate(alternateNode, scope);
-    }
+    this.assert(c[0].text(), 'if');
+    this.evaluate(c[2], scope, function(err, condition) {
+      if (err) { return cb(err); }
+      var consequentNode = c[4];
+      var alternateNode = null;
+      if (c.length > 6 && c[5].text() == 'else') {
+        alternateNode = c[6];
+      }
+      if (condition) {
+        this.evaluate(consequentNode, scope, cb);
+      } else if (alternateNode) {
+        this.evaluate(alternateNode, scope, cb);
+      } else {
+        cb();
+      }
+    });
   },
-  evaluateWhile: function(parserNode, scope) {
+  maxCallDepth: 100,
+  evaluateWhile: function(parserNode, scope, cb) {
     var c = parserNode.children;
-    this.assert(c[0]._text, 'while');
+    this.assert(c[0].text(), 'while');
     var conditionNode = c[2];
     var bodyNode = c[4];
-    while (this.evaluate(conditionNode, scope)) {
-      this.evaluate(bodyNode, scope);
+    var depth = 0;
+    this.evaluate(conditionNode, scope, testAndRun);
+    function testAndRun(err, condition) {
+      if (err) { return cb(err); }
+      if (depth++ > this.get('maxCallDepth')) {
+        var self = this;
+        setTimeout(function() {
+          depth = 0;
+          testAndRun.call(self, err, condition);
+        }, 0);
+        return;
+      }
+      if (condition) {
+        this.evaluate(bodyNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          this.evaluate(conditionNode, scope, testAndRun);
+        });
+      } else {
+        cb();
+      }
     }
   },
-  evaluatePostfix: function(parserNode, scope) {
+  evaluatePostfix: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var bodyNode = c[0];
     var op = c[1]._text;
     switch (bodyNode.name) {
       case 'identifier':
-        var oldValue = this.evaluate(bodyNode, scope);
-        var newValue = null;
-        switch (op) {
-          case '++':
-            newValue = oldValue + 1;
-            break;
-          case '--':
-            newValue = oldValue - 1;
-            break;
-          default:
-            throw new Error("Unknown operator type", op);
-        }
-        scope.updateValue(bodyNode.children[0]._text, newValue);
-        return oldValue;
+        this.evaluate(bodyNode, scope, function(err, oldValue) {
+          if (err) { return cb(err); }
+          var newValue = null;
+          switch (op) {
+            case '++':
+              newValue = oldValue + 1;
+              break;
+            case '--':
+              newValue = oldValue - 1;
+              break;
+            default:
+              return cb(new Error("Unknown operator type", op));
+          }
+          scope.updateValue(bodyNode.children[0].text(), newValue);
+          cb(null, oldValue);
+        });
+        break;
       default:
-        throw new Error("unable to apply", op, "postfix operator to", bodyNode);          
+        cb(new Error("unable to apply", op, "postfix operator to", bodyNode));
     }
   },
-  evaluatePrefix: function(parserNode, scope) {
+  evaluatePrefix: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var bodyNode = c[1];
     var op = c[0]._text;
     switch (bodyNode.name) {
       case 'identifier':
-        var value = this.evaluate(bodyNode, scope);
-        switch (op) {
-          case '++':
-            value += 1;
-            break;
-          case '--':
-            value -= 1;
-            break;
-          default:
-            throw new Error("Unknown operator type", op);
-        }
-        scope.updateValue(bodyNode.children[0]._text, value);
-        return value;
+        this.evaluate(bodyNode, scope, function(err, value) {
+          switch (op) {
+            case '++':
+              value += 1;
+              break;
+            case '--':
+              value -= 1;
+              break;
+            default:
+              return cb(new Error("Unknown operator type", op));
+          }
+          scope.updateValue(bodyNode.children[0].text(), value);          
+          cb(null, value);
+        });
+        break;
       default:
-        throw new Error("unable to apply", op, "postfix operator to", bodyNode);
+        cb(new Error("unable to apply", op, "postfix operator to", bodyNode));
     }      
   },
-  evaluateUnary: function(parserNode, scope) {
+  evaluateUnary: function(parserNode, scope, cb) {
     var c = parserNode.children;
-    var op = c[0]._text;
+    var op = c[0].text();
     var bodyNode = c[1];
     switch (op) {
       case '!':
-        return ! this.evaluate(bodyNode, scope);
+        this.evaluate(bodyNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          cb(null, ! val);
+        });
+        break;
       case '-':
-        return (- this.evaluate(bodyNode, scope));
+        this.evaluate(bodyNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          cb(null, - val);
+        });
+        break;
       case '+':
-        return (+ this.evaluate(bodyNode, scope));
+        this.evaluate(bodyNode, scope, function(err, val) {
+          if (err) { return cb(err); }
+          cb(null, + val);
+        });
+        break;
       default:
-        throw new Error("Unknown unary operator", op);
+        cb(new Error("Unknown unary operator", op));
     }
   },
   getNodePosition: function(node) {
@@ -454,9 +689,23 @@ JSEvaluator.Interpreter = Em.Object.extend({
     var pos = this.getNodePosition(node);
     return this.get('currentCode').substring(pos.start, pos.end);
   },
-  evaluate: function(parserNode, scope) {
+  
+  breakPeriod: 50,
+  evaluate: function(parserNode, scope, cb) {
+    var self = this;
+    var setBreak = false;
+    if (! this.get('nextBreak')) {
+      setBreak = true;
+      this.set('nextBreak', Date.now() + this.get('breakPeriod'));
+    } else if (Date.now() > this.get('nextBreak')) {
+      setTimeout(function() {
+        self.set('nextBreak', Date.now() + self.get('breakPeriod'));
+        self.evaluate(parserNode, scope, cb);
+      }, 0);
+      return;
+    }
     if (parserNode instanceof Array) {
-      return this.evaluateBlock(parserNode, scope);
+      return this.evaluateBlock(parserNode, scope, cb);
     }
     if (Date.now() > this.get('deadline')) {
       var e = new Error("Timeout at node");
@@ -465,110 +714,115 @@ JSEvaluator.Interpreter = Em.Object.extend({
       console.log("error at node", parserNode, pos, this.get('lineColMapping'));
       e.startPos = this.getLineCol(pos.start);
       e.endPos = this.getLineCol(pos.end);
-      throw e;
+      return cb(e);
     }
-    var ret;
+    function ecb(err, val) {
+      // console.log("Evaluating", self.getNodeText(parserNode), "which evaluates to", val);
+      cb.call(self, err, val);
+      if (setBreak) {
+        self.set('nextBreak', undefined);
+      }
+    }
     switch (parserNode.name) {
       case 'program':
-        ret = this.evaluateBlock(parserNode.children, scope);
+        this.evaluateBlock(parserNode.children, scope, ecb);
         break;
       case 'functionDecl':
         var f = this.createFunction(parserNode, scope);
         if (f.name) {
           scope.declareValue(f.name, f);
         } // else what?
-        ret = undefined;
+        ecb(null, undefined);
         break;
       case 'functionExpr':
         var f = this.createFunction(parserNode, scope);
         if (f.name) {
           scope.declareValue(f.name, f); // should this happen in the non-declaration case?
         }
-        ret = f;
+        ecb(null, f);
         break;
       case 'expressionStmnt':
-        ret = this.evaluateExpression(parserNode, scope);
+        this.evaluateExpression(parserNode, scope, ecb);
         break;
       case 'call':
-        ret = this.evaluateCall(parserNode, scope);
+        this.evaluateCall(parserNode, scope, ecb);
         break;
       case 'identifier':
         var out = scope.getValue(parserNode.children[0]._text);
         // console.log("lookup of", parserNode.children[0]._text, "in scope", scope, "=", out);
-        ret = out;
+        ecb(null, out);
         break;
       case 'dot':
-        ret = this.evaluateDot(parserNode, scope);
+        this.evaluateDot(parserNode, scope, ecb);
         break;
       case 'bracket':
-        ret = this.evaluateBracket(parserNode, scope);
+        this.evaluateBracket(parserNode, scope, ecb);
         break;
       case 'binary':
-        ret = this.evaluateBinary(parserNode, scope);
+        this.evaluateBinary(parserNode, scope, ecb);
         break;
       case 'blockStmnt':
-        this.assert(parserNode.children[0]._text, '{');
-        this.assert(parserNode.children[parserNode.children.length-1]._text, '}');
-        ret = this.evaluateBlock(parserNode.children.slice(1, parserNode.children.length-1), scope);
+        this.assert(parserNode.children[0].text(), '{');
+        this.assert(parserNode.children[parserNode.children.length-1].text(), '}');
+        this.evaluateBlock(parserNode.children.slice(1, parserNode.children.length-1), scope, ecb);
         break;
       case 'number': 
-        ret = Number(parserNode.children[0]._text);
+        ecb(null, Number(parserNode.children[0]._text));
         break;
       case 'string':
-        ret = eval(parserNode.children[0]._text);
+        ecb(null, eval(parserNode.children[0]._text));
         break;
       case 'object':
-        ret = this.evaluateObject(parserNode, scope);
+        this.evaluateObject(parserNode, scope, ecb);
         break;
       case 'array':
-        ret = this.evaluateArray(parserNode, scope);
+        this.evaluateArray(parserNode, scope, ecb);
         break;
       case 'this':
-        ret = scope.getValue('this');
+        ecb(null, scope.getValue('this'));
         break;
       case 'varStmnt':
-        this.evaluateVar(parserNode, scope);
-        ret = undefined;
+        this.evaluateVar(parserNode, scope, ecb);
         break;
       case 'assignment':
-        ret = this.evaluateAssignment(parserNode, scope);
+        this.evaluateAssignment(parserNode, scope, ecb);
         break;
       case 'ifStmnt':
-        this.evaluateIf(parserNode, scope);
-        ret = undefined;
+        this.evaluateIf(parserNode, scope, ecb);
         break;
       case 'whileStmnt':
-        this.evaluateWhile(parserNode, scope);
-        ret = undefined;
+        this.evaluateWhile(parserNode, scope, ecb);
         break;
       case 'prefix':
-        ret = this.evaluatePrefix(parserNode, scope);
+        this.evaluatePrefix(parserNode, scope, ecb);
         break;
       case 'postfix':
-        ret = this.evaluatePostfix(parserNode, scope);
+        this.evaluatePostfix(parserNode, scope, ecb);
         break;
       case 'parens':
-        ret = this.evaluateBlock(parserNode.children.slice(1, parserNode.children.length-1), scope);
+        this.evaluateBlock(parserNode.children.slice(1, parserNode.children.length-1), scope, ecb);
         break;
       case 'unary':
-        ret = this.evaluateUnary(parserNode, scope);
+        this.evaluateUnary(parserNode, scope, ecb);
         break;
       default:
-        throw new Error("unknown node type: "+parserNode.name);
+        ecb(new Error("unknown node type: "+parserNode.name));
     }
-    console.log("Evaluating", this.getNodeText(parserNode), "which evaluates to", ret);
-    return ret;
   },
-  evaluateBlock: function(parserNodes, scope) {
+  evaluateBlock: function(parserNodes, scope, cb) {
     var functionDeclarations = parserNodes.filter(function(node) {
       return node.name == 'functionDecl';
     });
-    functionDeclarations.forEach(function(node) {
-      this.evaluate(node, scope);
-    }, this);
-    parserNodes.forEach(function(node) {
-      if (node.name == 'functionDecl') { return; } // skip these now.
-      this.evaluate(node, scope);
+    JSEvaluator.Util.asyncForEach(functionDeclarations, function(node, index, cb) {
+      this.evaluate(node, scope, cb);
+    }, function(err, val) {
+      if (err) { return cb(err); }
+      var nonDeclarationNodes = parserNodes.filter(function(node) {
+        return node.name != 'functionDecl';
+      });
+      JSEvaluator.Util.asyncForEach(nonDeclarationNodes, function(node, index, cb) {
+        this.evaluate(node, scope, cb);
+      }, cb, this);
     }, this);
   },
     
@@ -594,17 +848,17 @@ JSEvaluator.Interpreter = Em.Object.extend({
     var m = this.get('lineColMapping');
     return {line: m.line[pos], col: m.col[pos]};
   },
-  timeout: 1000,
-  interpret: function(code, scope, timeout) {
+  timeout: 5000,
+  interpret: function(code, scope, timeout, cb) {
     console.log("running", JSON.stringify(code));
     this.set('deadline', Date.now() + (timeout || this.get('timeout') || 10000));
     if (scope && scope.get('interpreter') != this) {
-      throw new Error("Specified scope was not created by this interpreter.");
+      cb(new Error("Specified scope was not created by this interpreter."));
     }
     this.set('lineColMapping', this.calculateLineColumnMapping(code));
     this.set('currentCode', code);
     var parser = new JSParser(code, {});
-    this.evaluate(parser.getSyntaxTree(), scope || this.get('globalScope'));
+    this.evaluate(parser.getSyntaxTree(), scope || this.get('globalScope'), cb);
   },
   init: function() {
     this._super();

@@ -35,7 +35,7 @@
       }
 
       with (processing) {
-        var runUserCode = function() {
+        var runUserCode = function(cb) {
           // eval(userCode);
           var interpreter = window.JSEvaluator.Interpreter.create({
             builtIns: {
@@ -47,37 +47,43 @@
               remainingDots: remainingDots
             }
           });
-          try {
-            interpreter.interpret(userCode);            
-          } catch (e) {
-            if (e.errorType == "timeout") {
-              runtimeErrorHandler({
-                line: e.startPos.line+1, char: e.startPos.col,
-                msg: "Execution timed out."
-              });
+          interpreter.interpret(userCode, null, null, function(err, val) {
+            if (err) {
+              if (err.errorType == "timeout") {
+                runtimeErrorHandler({
+                  line: err.startPos.line+1, char: err.startPos.col,
+                  msg: "Execution timed out."
+                });
+              } else {
+                console.log(err);
+                runtimeErrorHandler({
+                  line: 0, char: 0,
+                  msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
+                });
+              }                
             } else {
-              console.log(e);
-              runtimeErrorHandler({
-                line: 0, char: 0,
-                msg: "Runtime error: "+(e && e.getMessage ? e.getMessage() : "(unknown)")
-              });
+              cb();
             }
-          }
+          });
           // var sim = interpreter.getSimulation();
         }
- 
+
+        var runningUserCode = false;
         // ROBOT CODE
         setup = function() {
           size(340, 340);
           background(255);
-          try {
+          // try {
             // console.log("setting initial level", startLevel);
             setLevel(startLevel);
-            runUserCode();              
-          } catch (e) {
+            runningUserCode = true;
+            runUserCode(function() {
+              runningUserCode = false;
+            });
+          // } catch (e) {
             // threw an error. continue partial execution anyway.
-            console.log(userCode, e);
-          }
+            // console.log(userCode, e);
+          // }
         }
  
         var MOVETIME = 200;
@@ -230,6 +236,7 @@
         }
  
         var addCommand = function(op) {
+          console.log("adding command:", op);
             var newPos = applyCommand(op);
             if (newPos) {
                 sim.position = newPos;
@@ -472,7 +479,7 @@
         }
  
         draw = function() {
-            // console.log("draw!");
+            if (runningUserCode) { return; }
             updatePosition();
             simRedraw();
         }
