@@ -1,42 +1,8 @@
 (function() {  
   function sketchProc(userCode, startLevel, runtimeErrorHandler, levelUnlockHandler) {
     return function(processing) {
-      var TIMEOUT = 5*1000;
-      if (! window.__ck) {
-        window.__ck = function(line, char) {
-          if (! window.__ck_lastrun) {
-            clearTimeout(window.__ck_timeout);
-            window.__ck_timeout = setTimeout(function() {
-              delete window.__ck_lastrun;
-            }, 0);
-            window.__ck_lastrun = +new Date();
-          }
-          var now = +new Date();
-          if (now - window.__ck_lastrun > TIMEOUT) {
-            // processing.println("Line "+line+", character "+char+": Execution exceeded "+Math.round(TIMEOUT/1000)+" seconds...perhaps you have an infinite loop?");
-            runtimeErrorHandler({
-              line: line,
-              char: char,
-              msg: "Execution timed out."
-            });
-            // $.ajax({
-            //   type: 'post',
-            //   url: '/runtimeError',
-            //   data: {
-            //     id: clientId,
-            //     line: line,
-            //     char: char,
-            //     msg: "Execution timed out."
-            //   }
-            // });
-            throw new Error("Execution timed out.");
-          }
-        }
-      }
-
       with (processing) {
-        var runUserCode = function(cb) {
-          // eval(userCode);
+        function runUserCode(cb) {
           var interpreter = window.JSEvaluator.Interpreter.create({
             builtIns: {
               right: right,
@@ -65,7 +31,6 @@
               cb();
             }
           });
-          // var sim = interpreter.getSimulation();
         }
 
         var runningUserCode = false;

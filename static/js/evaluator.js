@@ -33,6 +33,7 @@ JSEvaluator.Scope = Em.Object.extend({
   },
   declareValue: function(name, value) {
     this.get('variables')[name] = value;
+    // console.log("declaring variable", name, "with initial value", value);
   },
   updateValue: function(name, value) {
     if (name in this.get('variables') || ! this.get('parent')) {
@@ -140,20 +141,20 @@ JSEvaluator.Interpreter = Em.Object.extend({
   },
   createFunction: function(parserNode, scope) {
     var c = parserNode.children;
-    this.assert(c[0]._text, 'function'); // just checking...
-    var name = c[1]._type == 'IDENTIFIER' ? c[1]._text : null;
-    this.assert(c[2]._text, '(');
+    this.assert(c[0].text(), 'function'); // just checking...
+    var name = c[1]._type == 'IDENTIFIER' ? c[1].text() : null;
+    this.assert(c[2].text(), '(');
     var i = 3;
     var argumentNames = [];
-    while (c[i]._text != ')') { // "function foo(a,b,c,)" with trailing , in argument list should be caught by parser, right...?
+    while (c[i].text() != ')') { // "function foo(a,b,c,)" with trailing , in argument list should be caught by parser, right...?
       argumentNames.push(c[i]._text);
-      if (c[i+1]._text == ',') {
+      if (c[i+1].text() == ',') {
         i += 2;
       } else {
         i++;
       }
     }
-    this.assert(c[i]._text, ')'); i++;
+    this.assert(c[i].text(), ')'); i++;
     if (c[i]._text == '{') {
       i++;
     }
@@ -174,7 +175,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   },
   evaluateExpression: function(parserNode, scope, cb) {
     var c = parserNode.children;
-    this.assert(c[1]._text, ';')
+    this.assert(c[1].text(), ';')
     this.evaluate(c[0], scope, cb);
   },
   getBaseAndKey: function(parserNode, scope, cb) {
@@ -186,14 +187,14 @@ JSEvaluator.Interpreter = Em.Object.extend({
         this.assert(c[1].text(), '.');
         var key = c[2].text();
         this.evaluate(baseNode, scope, function(err, baseVal) {
-          if (err) { return cb(err); }
+          if (err) { return cb.call(this, err); }
           if (typeof(baseVal) !== 'object') {
-            return cb(new Error("'"+baseVal+"' is not an object"));
+            return cb.call(this, new Error("'"+baseVal+"' is not an object"));
           }
-          cb(null, {
+          cb.call(this, null, {
             base: baseVal,
             key: key,
-            value: val.retrieve(key)
+            value: baseVal.retrieve(key)
           });
         });
         break;
@@ -203,13 +204,13 @@ JSEvaluator.Interpreter = Em.Object.extend({
         var key = c[2];
         this.assert(c[3].text(), ']');
         this.evaluate(baseNode, scope, function(err, baseVal) {
-          if (err) { return cb(err); }
+          if (err) { return cb.call(this, err); }
           if (typeof(baseVal) !== 'object') {
-            return cb(new Error("'"+baseVal+"' is not an object"));
+            return cb.call(this, new Error("'"+baseVal+"' is not an object"));
           }
           this.evaluate(key, scope, function(err, keyVal) {
-            if (err) { return cb(err); }
-            cb(null, {
+            if (err) { return cb.call(this, err); }
+            cb.call(this, null, {
               base: baseVal, 
               key: keyVal,
               value: baseVal.retrieve(keyVal)
@@ -218,7 +219,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
         });
         break;
       default:
-        cb(new Error("Unknown node type "+parserNode.name+" to get base and key from."));
+        cb.call(this, new Error("Unknown node type "+parserNode.name+" to get base and key from."));
     }
   },
   evaluateCall: function(parserNode, scope, cb) {
@@ -290,7 +291,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
     var self = this;
     var c = parserNode.children;
     // this.assert(c[1]._type, 'PUNCTUATION'); // could be PUNCTUATION or KEYWORD.
-    var op = c[1]._text;
+    var op = c[1].text();
     this.evaluate.call(this, c[0], scope, function(err, lhs) {
       switch (op) {
         case '+':
@@ -399,18 +400,18 @@ JSEvaluator.Interpreter = Em.Object.extend({
   evaluateObject: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var object = {};
-    this.assert(c[0]._text, '{');
-    this.assert(c[c.length-1]._text, '}');
+    this.assert(c[0].text(), '{');
+    this.assert(c[c.length-1].text(), '}');
     JSEvaluator.Util.asyncForEach(c, function(n, i, cb) {
-      if (n.name != 'prop') { return; }
+      if (n.name != 'prop') { return cb(); }
       var pc = n.children;
-      this.assert(pc[1]._text, ':');
+      this.assert(pc[1].text(), ':');
       var n = pc[0];
       switch (n.name) {
         case 'idPropName':
           this.evaluate(pc[2], scope, function(err, val) {
             if (err) { return cb(err); }
-            object[n.children[0]._text] = val;
+            object[n.children[0].text()] = val;
             cb();            
           });
           break;
@@ -419,7 +420,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
           this.evaluate(pc[2], scope, function(err, val) {
             if (err) { return cb(err); }
             // eval the string or number text to get an actual string or number
-            object[eval(n.children[0]._text)] = val;
+            object[eval(n.children[0].text())] = val;
             cb();
           });
           break;
@@ -434,8 +435,8 @@ JSEvaluator.Interpreter = Em.Object.extend({
   evaluateArray: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var arr = [];
-    this.assert(c[0]._text, '[');
-    this.assert(c[c.length-1]._text, ']');
+    this.assert(c[0].text(), '[');
+    this.assert(c[c.length-1].text(), ']');
     var i = 1;
     while (c[i]._text != ']') {
       arr.push(c[i]);
@@ -458,10 +459,10 @@ JSEvaluator.Interpreter = Em.Object.extend({
     }, this);
   },
   evaluateVar: function(parserNode, scope, cb) {
-    this.assert(parserNode.children[0]._text, 'var');
+    this.assert(parserNode.children[0].text(), 'var');
     JSEvaluator.Util.asyncForEach(parserNode.children, function(node, i, cb) {
       if (node.name == 'varDecl') {
-        if (node.children.length == 2) {
+        if (node.children.length == 3) {
           this.evaluate(node.children[2], scope, function(err, val) {
             if (err) { return cb(err); }
             scope.declareValue(node.children[0].text(), val);
@@ -480,7 +481,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   },
   evaluateAssignment: function(parserNode, scope, cb) {
     var c = parserNode.children;
-    var op = c[1]._text;
+    var op = c[1].text();
     switch (c[0].name) {
       case 'identifier':
         switch (op) {
@@ -495,7 +496,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
             var oldValue = scope.getValue(c[0].children[0].text());
             this.evaluate(c[2], scope, function(err, val) {
               if (err) { return cb(err); }
-              scope.updateValue(c[0].children[0]._text, oldValue + val);
+              scope.updateValue(c[0].children[0].text(), oldValue + val);
               cb(null, oldValue + val);
             });
             break;
@@ -503,7 +504,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
             var oldValue = scope.getValue(c[0].children[0].text());
             this.evaluate(c[2], scope, function(err, val) {
               if (err) { return cb(err); }
-              scope.updateValue(c[0].children[0]._text, oldValue - val);
+              scope.updateValue(c[0].children[0].text(), oldValue - val);
               cb(null, oldValue + val);
             });
             break;
@@ -541,6 +542,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
               cb(new Error("unknown operator: "+op));
           }          
         });
+        break;
       default:
         cb(new Error("Unknown assignee node: "+c[0]));
     }
@@ -564,7 +566,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
       }
     });
   },
-  maxCallDepth: 100,
+  maxCallDepth: 1000,
   evaluateWhile: function(parserNode, scope, cb) {
     var c = parserNode.children;
     this.assert(c[0].text(), 'while');
@@ -595,7 +597,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   evaluatePostfix: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var bodyNode = c[0];
-    var op = c[1]._text;
+    var op = c[1].text();
     switch (bodyNode.name) {
       case 'identifier':
         this.evaluate(bodyNode, scope, function(err, oldValue) {
@@ -622,7 +624,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   evaluatePrefix: function(parserNode, scope, cb) {
     var c = parserNode.children;
     var bodyNode = c[1];
-    var op = c[0]._text;
+    var op = c[0].text();
     switch (bodyNode.name) {
       case 'identifier':
         this.evaluate(bodyNode, scope, function(err, value) {
@@ -717,7 +719,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
       return cb(e);
     }
     function ecb(err, val) {
-      // console.log("Evaluating", self.getNodeText(parserNode), "which evaluates to", val);
+      console.log("Evaluating", self.getNodeText(parserNode), "which evaluates to", val);
       cb.call(self, err, val);
       if (setBreak) {
         self.set('nextBreak', undefined);
@@ -748,8 +750,8 @@ JSEvaluator.Interpreter = Em.Object.extend({
         this.evaluateCall(parserNode, scope, ecb);
         break;
       case 'identifier':
-        var out = scope.getValue(parserNode.children[0]._text);
-        // console.log("lookup of", parserNode.children[0]._text, "in scope", scope, "=", out);
+        var out = scope.getValue(parserNode.children[0].text());
+        // console.log("lookup of", parserNode.children[0].text(), "in scope", scope, "=", out);
         ecb(null, out);
         break;
       case 'dot':
@@ -767,10 +769,10 @@ JSEvaluator.Interpreter = Em.Object.extend({
         this.evaluateBlock(parserNode.children.slice(1, parserNode.children.length-1), scope, ecb);
         break;
       case 'number': 
-        ecb(null, Number(parserNode.children[0]._text));
+        ecb(null, Number(parserNode.children[0].text()));
         break;
       case 'string':
-        ecb(null, eval(parserNode.children[0]._text));
+        ecb(null, eval(parserNode.children[0].text()));
         break;
       case 'object':
         this.evaluateObject(parserNode, scope, ecb);
