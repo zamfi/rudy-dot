@@ -1,9 +1,13 @@
 (function() {  
-  function sketchProc(userCode, runtimeErrorHandler, updateWidth) {
+  function sketchProc(userCode, runtimeErrorHandler, updateWidth, eventHandler) {
     return function(processing) {
       var TIMEOUT = 5*1000;
       if (! window.__ck) {
         window.__ck = function(line, char) {
+          if (window.__ck_kill) {
+            delete window.__ck_kill;
+            throw new Error("Exection stopped.");
+          }
           if (! window.__ck_lastrun) {
             clearTimeout(window.__ck_timeout);
             window.__ck_timeout = setTimeout(function() {
@@ -26,13 +30,29 @@
 
       with (processing) {
         var _size = size;
+        var _draw = draw;
         size = function(x,y) {
           _size(x,y);
           updateWidth(x);
         }
+        eventHandler.start({ stop: function() { 
+          window.__ck_kill = true;
+          if (processingInstance) {
+            processingInstance.noLoop();
+          }
+          eventHandler.stop();
+        }});
         try {
-          eval(userCode);          
+          eval(userCode);
+          if (draw == _draw) {
+            // draw wasn't set, so...nothing will loop.
+            eventHandler.stop();
+          }
         } catch (e) {
+          if (processingInstance) {
+            processingInstance.noLoop();
+          }
+          eventHandler.stop();
           console.log(userCode, e);
         }
       }

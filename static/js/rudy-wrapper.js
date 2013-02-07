@@ -1,28 +1,44 @@
 (function() {  
-  function sketchProc(userCode, startLevel, runtimeErrorHandler, levelUnlockHandler) {
+  function sketchProc(userCode, startLevel, eventHandler) {
+    function passEvent(name, arg1, arg2, etc) {
+      if (eventHandler && eventHandler[name+"Handler"]) {
+        eventHandler[name+"Handler"].apply(eventHandler, Array.prototype.slice.call(arguments, 1));
+      }
+    }
     return function(processing) {
       with (processing) {
         function runUserCode(cb) {
           var interpreter = window.JSEvaluator.Interpreter.create({
             builtIns: {
-              right: right,
-              down: down,
-              up: up,
-              left: left,
-              coloring: coloring,
-              remainingDots: remainingDots
-            }
+              right: {type: "async-function", underlying: right},
+              down: {type: "async-function", underlying: down},
+              up: {type: "async-function", underlying: up},
+              left: {type: "async-function", underlying: left},
+              coloring: {type: "sync-function", underlying: coloring},
+              remainingDots: {type: "sync-function", underlying: remainingDots}
+            },
+            eventDelegate: eventHandler,
+            evaluationDelayBinding: "eventDelegate.evaluationDelay"
           });
+          passEvent("start", interpreter);
           interpreter.interpret(userCode, null, null, function(err, val) {
             if (err) {
               if (err.errorType == "timeout") {
-                runtimeErrorHandler({
+                processing.noLoop();
+                passEvent("runtimeError", {
                   line: err.startPos.line+1, char: err.startPos.col,
                   msg: "Execution timed out."
                 });
+              } else if (err.errorType == "stopped") {
+                processing.noLoop();
+                passEvent("runtimeError", {
+                  line: err.startPos.line+1, char: err.startPos.col,
+                  msg: "Interpreter stopped."
+                });
               } else {
                 console.log(err);
-                runtimeErrorHandler({
+                processing.noLoop();
+                passEvent("runtimeError", {
                   line: 0, char: 0,
                   msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
                 });
@@ -30,56 +46,46 @@
             } else {
               cb();
             }
+            passEvent("stop");
           });
         }
 
-        var runningUserCode = false;
         // ROBOT CODE
         setup = function() {
           size(340, 340);
           background(255);
-          // try {
-            // console.log("setting initial level", startLevel);
-            setLevel(startLevel);
-            runningUserCode = true;
-            runUserCode(function() {
-              runningUserCode = false;
-            });
-          // } catch (e) {
-            // threw an error. continue partial execution anyway.
-            // console.log(userCode, e);
-          // }
+          setLevel(startLevel);
+          runUserCode(function() {});
         }
- 
-        var MOVETIME = 200;
- 
+  
         var position = null;
-        var sim;
+        var nextPosition = null;
+        var levels;
+        var levelNum = 0;
+        var level;
         var setLevel = function(startLevel) {
-            sim = {
-                levels: [
-                    {trash: new PositionSet([ {x: 5, y: 5}, {x: 7, y: 5} ]),
-                     obstacles: makeObstacles(2, 0, 1, 7) },
-                    {trash: new PositionSet([ {x: 9, y: 8 } ]),
-                     obstacles: makeObstacles(1,0,1,8).concat(makeObstacles(3,2,1,8)).concat(makeObstacles(5,0,1,8)).concat(makeObstacles(7,2,1,8)).concat(makeObstacles(9,0,1,8)) },
-                    level3(),
-                    level4(),
-                    level5()
-                  ],
-                simulation: [],
-                level: (startLevel || 1)-1
-            };
-            sim.position = sim.levels[sim.level].start || {x: 0, y: 0};
-            sim.simulation.push({type: "start-position", pos: sim.position});
+          levelNum = (startLevel || 1)-1;
+          levels = [
+            {dots: new PositionSet([ {x: 5, y: 5}, {x: 7, y: 5} ]),
+             obstacles: makeObstacles(2, 0, 1, 7) },
+            {dots: new PositionSet([ {x: 9, y: 8 } ]),
+             obstacles: makeObstacles(1,0,1,8).concat(makeObstacles(3,2,1,8)).concat(makeObstacles(5,0,1,8)).concat(makeObstacles(7,2,1,8)).concat(makeObstacles(9,0,1,8)) },
+            level3(),
+            level4(),
+            level5()
+          ];
+          level = levels[levelNum];
+          
+          position = level.start || {x: 0, y: 0};
         }
  
         var coloring = function() {
-            if (! sim.levels[sim.level].colors) { return false; }
-            var c = sim.levels[sim.level].colors.contains(sim.position.x, sim.position.y);
+            if (! level.colors) { return false; }
+            var c = level.colors.contains(position.x, position.y);
             return c ? c.hue : false;
         }
         var remainingDots = function() {
-            return sim.levels[sim.level] ? sim.levels[sim.level].trash.list.length - sim.levels[sim.level].trash.count("found", true) : 0;
+            return level ? level.dots.list.length - level.dots.count("found", true) : 0;
         }
  
         function level3() {
@@ -100,7 +106,7 @@
             }
             var ret = {
                 start: { x: 0, y: 5 },
-                trash: new PositionSet([ { x:9, y: holes[holes.length-1] } ]),
+                dots: new PositionSet([ { x:9, y: holes[holes.length-1] } ]),
                 obstacles: obstacles,
                 colors: colors
             };
@@ -125,7 +131,7 @@
             }
             var ret = {
                 start: { x: 0, y: 0 },
-                trash: new PositionSet([ { x:9, y: 9 } ]),
+                dots: new PositionSet([ { x:9, y: 9 } ]),
                 obstacles: obstacles,
                 colors: colors
             };
@@ -194,46 +200,69 @@
           }
           return {
             start: {x: 0, y: 0},
-            trash: new PositionSet([lastNextPos]),
+            dots: new PositionSet([lastNextPos]),
             obstacles: obstacles,
             colors: colors
           };
         }
  
-        var addCommand = function(op) {
-          console.log("adding command:", op);
-            var newPos = applyCommand(op);
-            if (newPos) {
-                sim.position = newPos;
-                sim.simulation.push({type: "move", pos: sim.position});
-                var trash = sim.levels[sim.level].trash.contains(sim.position.x, sim.position.y);
-                if (trash) {
-                    trash.found = true;
-                    sim.simulation.push({type: "found-trash", pos: sim.position});
+        var MOVETIME = 200;
+        var moveFinishedCb;
+        var overlayText = null;
+        var moveStart = -MOVETIME;
+        var runCommand = function(op, cb) {
+          console.log("running command:", op);
+          var newPos = applyCommand(op);
+          if (newPos) {
+            nextPosition = newPos;
+            moveStart = millis();
+            moveFinishedCb = function() {
+              position = nextPosition;
+              nextPosition = null;
+              var dot = level.dots.contains(position.x, position.y);
+              if (dot) {
+                dot.found = true;
+              }
+              if (remainingDots() == 0) {
+                if (levelNum < levels.length) {
+                  passEvent("levelUnlock", levelNum+2);                  
                 }
-                if (sim.levels[sim.level].trash.count("found", true) == sim.levels[sim.level].trash.list.length) {
-                    // advance level
-                    // sim.level++;
-                    if (sim.level < sim.levels.length) {
-                        // sim.position = sim.levels[sim.level].start || {x: 0, y: 0};
-                        sim.simulation.push({type: "level", level: sim.level+2}); // 2 because sim.level is one less than the real level.
-                    }
-                }
-            } else {
-                sim.simulation.push({type: "move", pos: sim.position});
+                overlayText = "LEVEL "+(levelNum+1)+"\nCLEARED";
+              }
+              moveFinishedCb = null;
+              cb();
             }
+            // sim.position = newPos;
+            // sim.simulation.push({type: "move", pos: sim.position});
+            // var trash = sim.levels[sim.level].trash.contains(sim.position.x, sim.position.y);
+            // if (trash) {
+            //   trash.found = true;
+            //   sim.simulation.push({type: "found-trash", pos: sim.position});
+            // }
+            // if (sim.levels[sim.level].trash.count("found", true) == sim.levels[sim.level].trash.list.length) {
+            //   // advance level
+            //   // sim.level++;
+            //   if (sim.level < sim.levels.length) {
+            //       // sim.position = sim.levels[sim.level].start || {x: 0, y: 0};
+            //       sim.simulation.push({type: "level", level: sim.level+2}); // 2 because sim.level is one less than the real level.
+            //   }
+            // }
+          } else {
+            setTimeout(cb, MOVETIME);
+            // sim.simulation.push({type: "move", pos: sim.position});
+          }
         }
-        var left = function() {
-            addCommand('left');
+        var left = function(cb) {
+          runCommand('left', cb);
         }
-        var right = function() {
-            addCommand('right');
+        var right = function(cb) {
+          runCommand('right', cb);
         }
-        var up = function() {
-            addCommand('up');
+        var up = function(cb) {
+          runCommand('up', cb);
         }
-        var down = function() {
-            addCommand('down');
+        var down = function(cb) {
+          runCommand('down', cb);
         }
  
         var GRIDWIDTH=30;
@@ -241,30 +270,29 @@
         var CELLROWS = 10;
         var CELLCOLS = 10;
         var applyCommand = function(command) {
-            var np = null;
-            switch(command) {
-                case 'right':
-                    np = {x: sim.position.x+1, y: sim.position.y};
-                    break;
-                case 'left':
-                    np = {x: sim.position.x-1, y: sim.position.y};
-                    break;
-                case 'up':
-                    np = {x: sim.position.x, y: sim.position.y-1};
-                    break;
-                case 'down':
-                    np = {x: sim.position.x, y: sim.position.y+1};
-                    break;
-                default:
-                    println("unknown command: "+command);
-            }
-            if ((! np) || 
-                sim.levels[sim.level].obstacles.contains(np.x, np.y) ||
-                np.x < 0 || np.y < 0 || np.x > (CELLCOLS-1) || np.y > (CELLROWS-1)) {
-                return false;
-            } else {
-                return np;
-            }
+          var np = null;
+          switch(command) {
+            case 'right':
+              np = {x: position.x+1, y: position.y};
+              break;
+            case 'left':
+              np = {x: position.x-1, y: position.y};
+              break;
+            case 'up':
+              np = {x: position.x, y: position.y-1};
+              break;
+            case 'down':
+              np = {x: position.x, y: position.y+1};
+              break;
+            default:
+              println("unknown command: "+command);
+          }
+          if (! np) { return false; }
+          if (level.obstacles.contains(np.x, np.y) ||
+              np.x < 0 || np.y < 0 || np.x > (CELLCOLS-1) || np.y > (CELLROWS-1)) {
+            return false;
+          }
+          return np;
         }
  
         var makeObstacles = function(x, y, width, height) {
@@ -281,51 +309,55 @@
             ellipse(MARGIN+(loc.x+0.5)*GRIDWIDTH, MARGIN+(loc.y+0.5)*GRIDWIDTH, GRIDWIDTH/2, GRIDWIDTH/2);
         }
  
-        var obstacleGrid;
-        var nextPosition;
-        var programCounter = 0;
+        // var nextPosition;
+        // var programCounter = 0;
  
         var moveStart = -MOVETIME;
         var drawCurrentPosition = function() {
-            var p = sim.position;
+          var p = position;
+          fill(238, 0, 0); // red
+          if (nextPosition) {
             var np = nextPosition;
-            fill(238, 0, 0); // red
             ellipseAtLoc({ 
                 x: p.x+(np.x-p.x)*Math.min(MOVETIME, millis()-moveStart)/MOVETIME,
                 y: p.y+(np.y-p.y)*Math.min(MOVETIME, millis()-moveStart)/MOVETIME
             });
+          } else {
+            ellipseAtLoc(position);
+          }
         }
         var updatePosition = function() {
-            if (millis()-moveStart > MOVETIME) {
-                if (programCounter >= sim.simulation.length) {
-                    noLoop();
-                    return;
-                }
-                sim.position = nextPosition;
-                var resume = false;
-                while (! resume && programCounter < sim.simulation.length) {
-                    var cmd = sim.simulation[programCounter++];
-                    switch (cmd.type) {
-                        case 'level':
-                            levelUnlockHandler(cmd.level);
-                            sim.overlayText = "LEVEL "+(cmd.level-1)+"\nCLEARED";
-                            break;
-                        case 'found-trash':
-                            sim.levels[sim.level].trash.contains(cmd.pos.x, cmd.pos.y).hide = true;
-                            break;
-                        case 'start-position':
-                            nextPosition = sim.position = cmd.pos;
-                            break;
-                        case 'move':
-                            // console.log("moving to", cmd.pos.x+","+cmd.pos.y);
-                            nextPosition = cmd.pos;
-                            resume = true;
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                moveStart = millis();
+            if (millis()-moveStart > MOVETIME && moveFinishedCb) {
+              moveFinishedCb();
+                // if (programCounter >= sim.simulation.length) {
+                //     noLoop();
+                //     return;
+                // }
+                // sim.position = nextPosition;
+                // var resume = false;
+                // while (! resume && programCounter < sim.simulation.length) {
+                //     var cmd = sim.simulation[programCounter++];
+                //     switch (cmd.type) {
+                //         case 'level':
+                //             levelUnlockHandler(cmd.level);
+                //             sim.overlayText = "LEVEL "+(cmd.level-1)+"\nCLEARED";
+                //             break;
+                //         case 'found-trash':
+                //             sim.levels[sim.level].trash.contains(cmd.pos.x, cmd.pos.y).hide = true;
+                //             break;
+                //         case 'start-position':
+                //             nextPosition = sim.position = cmd.pos;
+                //             break;
+                //         case 'move':
+                //             // console.log("moving to", cmd.pos.x+","+cmd.pos.y);
+                //             nextPosition = cmd.pos;
+                //             resume = true;
+                //             break;
+                //         default:
+                //             break;
+                //     }
+                // }
+                // moveStart = millis();
             }
         }
  
@@ -392,8 +424,8 @@
         }
  
         var drawColors = function() {
-            if (sim.levels[sim.level].colors) {
-                sim.levels[sim.level].colors.forEach(function(c) {
+            if (level.colors) {
+                level.colors.forEach(function(c) {
                     setFill(c.hue);
                     rect(MARGIN+c.x*GRIDWIDTH+1,
                          MARGIN+c.y*GRIDWIDTH+1,
@@ -404,7 +436,7 @@
  
         var drawObstacles = function() {
             fill(154);
-            sim.levels[sim.level].obstacles.forEach(function(o) {
+            level.obstacles.forEach(function(o) {
                 rect(MARGIN+o.x*GRIDWIDTH,
                      MARGIN+o.y*GRIDWIDTH,
                      GRIDWIDTH, GRIDWIDTH);
@@ -417,8 +449,8 @@
             var fontA = loadFont("Courier New");
             textFont(fontA, 12);
             textAlign(LEFT);
-            trashFound = sim.levels[sim.level].trash.list.length - sim.levels[sim.level].trash.count("hide", true);
-            text("Green dots remaining: "+trashFound, 20, 10);
+            // var dotsRemaining = level.dots.list.length - level.dots.count("hide", true);
+            text("Green dots remaining: "+remainingDots(), 20, 10);
  
             stroke(204);
             for (var i = 0; i <= CELLCOLS+1; ++i) {
@@ -431,20 +463,20 @@
             drawColors();
             drawObstacles();
             fill(0, 238, 0); // green
-            sim.levels[sim.level].trash.list.filter(function(x) { return ! x.hide; }).forEach(ellipseAtLoc);
+            level.dots.list.filter(function(x) { return ! x.found; }).forEach(ellipseAtLoc);
             drawCurrentPosition();
-            if (sim.overlayText) {
+            if (overlayText) {
               fill(255,128);
               rect(0,0,width,height);
               fill(238,0,0);
               textFont(fontA, 48);
               textAlign(CENTER);
-              text(sim.overlayText, width/2, 150);
+              text(overlayText, width/2, 150);
             }
         }
  
         draw = function() {
-            if (runningUserCode) { return; }
+            // if (runningUserCode) { return; }
             updatePosition();
             simRedraw();
         }
@@ -458,9 +490,7 @@
       // console.log(processingInstance);
     }
     var canvas = document.getElementById('pjs');
-    processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), 
-      function(arg) {controller.runtimeErrorHandler(arg);}, 
-      function(arg) {controller.levelUnlockHandler(arg);}));
+    processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller));
   }
 
   window.ProcessingWrapper = {

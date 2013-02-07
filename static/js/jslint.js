@@ -4365,7 +4365,10 @@ klass:              do {
             spaces(this, paren);
             no_space();
             if (next_token.id === 'var') {
-                stop('move_var');
+                // stop('move_var');
+                // don't stop b/c of this. instead, ignore it.
+                advance();
+                add_label(next_token, 'unused');
             }
             edge();
             if (peek(0).id === 'in') {

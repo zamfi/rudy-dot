@@ -58,7 +58,8 @@ window.CodingSupport = Em.Namespace.create({
         white: true,
         regexp: true,
         forin: true,
-        sub: true
+        sub: true,
+        'continue': true
       });
       if (! pass) {
         return JSLINT.errors;
@@ -238,6 +239,32 @@ window.CodingSupport = Em.Namespace.create({
     controller: null
   }),
   
+  CallStackView: Em.View.extend({
+    controller: Em.required(),
+    isRunning: function() {
+      return this.get('controller.state') == 'running';
+    }.property('controller.state'),
+    callstackBinding: "controller.callstack",
+    callstackMembers: function() {
+      return this.get('callstack').filterProperty('visible', true);
+    }.property('callstack.[]')
+  }),
+  
+  ScopesView: Em.View.extend({
+    controller: Em.required(),
+    isRunning: function() {
+      return this.get('controller.state') == 'running';
+    }.property('controller.state'),
+    scopesBinding: 'controller.scopes'
+  }),
+  
+  ScopeView: Em.View.extend({
+    scope: Em.required(),
+    keys: function() {
+      
+    }.property('scope.definedVariables.[]')
+  }),
+  
   CodeController: Em.Object.extend({
     validate: function(code, suppressBoxes) {
       this.get('codeMirrorView').clearErrors();
@@ -290,7 +317,8 @@ window.CodingSupport = Em.Namespace.create({
           (cb || Em.K)(false);
         }
       });      
-    }, 
+    },
+    state: "stopped", 
     play: function() {
       // var randomId = ""+Math.round(Math.random()*10000000000);
       var sketchId = this.get('sketchId');
@@ -305,6 +333,51 @@ window.CodingSupport = Em.Namespace.create({
       window.ProcessingWrapper.executeCode(code /* instrumentedCode */, this);
       // console.log("new window with", sketchId, clientId, randomId);
       // window.open('/play/'+[this.get('codeTemplate'), sketchId, clientId, randomId].join('/'), 'rudy-'+this.get('codeTemplate'));
+    },
+    stop: function() {
+      var runController = this.get('runController');
+      if (runController) {
+        runController.stop();
+      }
+    },
+    startHandler: function(control) {
+      this.set('callstack', []);
+      this.set('runController', control);
+      this.set('state', 'running');
+    },
+    stopHandler: function() {
+      this.set('runController', null);
+      this.set('state', 'stopped');
+    },
+    evaluationStartHandler: function(callId, nodeType, pos) {
+      if (nodeType == 'program') { return; }
+      var padding = "";
+      var n = this.get('callstack').length;
+      while (n--) {
+        padding += " ";
+      }
+      console.log("evaluating", padding, nodeType, pos);
+      var mark = this.get('codeArea').markText(pos.start, pos.end, 'eval'+this.get('callstack').length);
+      this.get('callstack').pushObject({
+        id: callId,
+        visible: (nodeType == 'call' || nodeType == 'whileStmnt'),
+        pos: pos,
+        text: this.get('codeArea').getRange(pos.start, pos.end)+"\n",
+        mark: mark
+      });
+    },
+    evaluationEndHandler: function(callId, nodeType, pos, ret) {
+      if (nodeType == 'program') { return; }
+      var cs = this.get('callstack');
+      if (cs[cs.length-1].id != callId) {
+        console.log("wtf?", callId, cs[cs.length-1].id);
+        return;
+      }
+      cs.popObject().mark.clear();
+    },
+    scopes: [],
+    createScopeHandler: function(scope) {
+      this.get('scopes').pushObject(scope);
     },
     parse: function() {
       var code = this.getCode();
