@@ -9,6 +9,7 @@
 <script type="text/javascript" src="/js/jsparse/stringify.js"></script>
 <script type="text/javascript" src="/js/jsparse/parser.js"></script>
 
+<% helpers.includeTemplate('eval-views.html'); %>
 
 <script type="text/javascript">
   window.Main = Em.Application.create({
@@ -28,8 +29,8 @@
       },
       
       extra: function() {
-        return {level: this.get('level'), maxLevel: this.get('maxLevel')};
-      }.property('level', 'maxLevel'),
+        return {level: this.get('level'), maxLevel: this.get('maxLevel'), evaluationDelay: this.get('evaluationDelay')};
+      }.property('level', 'maxLevel', 'evaluationDelay'),
       
       levelUnlockHandler: function(newLevel) {
         if (this.get('maxLevel') < newLevel) {
@@ -43,7 +44,10 @@
           this.noteCodeChange();
         }
       },
-      evaluationDelay: 250,
+      evaluationDelay: <%= extra && 'evaluationDelay' in extra ? extra.evaluationDelay : 256 %>,
+      evaluationDelayWatch: function() {
+        this.noteCodeChange();
+      }.observes('evaluationDelay'),
       showInitialState: function() {
         window.ProcessingWrapper.executeCode("", this);
       }.observes('level'),
@@ -56,7 +60,10 @@
       play: function() {
         document.getElementById('pjs-wrapper').scrollTop = 0;
         this._super();
-      }
+      },
+      running: function() {
+        return this.get('state') == 'running';
+      }.property('state')
     }),
     ToolbarView: Em.View.extend({
       play: function() {
@@ -65,9 +72,7 @@
       stop: function() {
         this.get('controller').stop();
       },
-      running: function() {
-        return this.get('controller.state') == 'running';
-      }.property('controller.state'),
+      runningBinding: "controller.running",
       parse: function() {
         this.get('controller').parse();
       },
@@ -85,7 +90,21 @@
       }.property('controller.level'),
       revertStyle: function() {
         return this.get('canRevert') ? "font-size: 10px;" : "font-size: 10px; visibility: hidden;";
-      }.property('canRevert')
+      }.property('canRevert'),
+      increaseEvaluationDelay: function() {
+        if (this.get('controller.evaluationDelay') == 0) {
+          this.set('controller.evaluationDelay', 1);
+        } else {
+          this.set('controller.evaluationDelay', this.get('controller.evaluationDelay')*2);
+        }
+      },
+      decreaseEvaluationDelay: function() {
+        if (this.get('controller.evaluationDelay') == 1) {
+          this.set('controller.evaluationDelay', 0);
+        } else {
+          this.set('controller.evaluationDelay', Math.round(this.get('controller.evaluationDelay')/2));
+        }
+      }
     }),
     NotifyOnLoadView: Em.View.extend({
       didInsertElement: function() {
@@ -98,7 +117,9 @@
     document.onkeypress = function(e) {
       if ((e.ctrlKey || e.metaKey) && e.keyCode == 114) { // Ctrl-R
         e.preventDefault();
-        window.Main.controller.play();
+        if (! window.Main.controller.get('running')) {
+          window.Main.controller.play();
+        }
       }
     }
   });
@@ -118,24 +139,19 @@
       {{else}}
         <button class="btn btn-primary" {{action "play"}}><i class="icon-play icon-white"></i> Run</button>
       {{/if}}
+      <span style="display: inline-block; padding-left: 30px;">Evaluation step delay: <span class="arrows"><a href="#" {{action increaseEvaluationDelay}}>⬆</a><br><a href="#" {{action decreaseEvaluationDelay}}>⬇</a></span> {{Main.controller.evaluationDelay}} ms</span>
       <!-- <button class="btn btn-info" {{action "parse"}}><i class="icon-white icon-leaf"></i> Parse</button> -->
       <span style="display: inline-block; padding-left: 30px">
         <span {{bindAttr style="view.revertStyle"}}><a href="#" {{action "revertLevel"}}>&laquo; go back</a></span>
         <span style="padding-left: 10px; padding-right: 10px;">Level: <strong>{{level}}</strong></span>
         {{#if view.canAdvance}}<button class="btn btn-mini btn-success" {{action "advanceLevel"}}>Advance ➙</button>{{/if}}
       </span>
-      
+      <div></div>
     {{/view}}
   </div>
   <div id="pjs-wrapper" class="pull-right" style="width: 360px; padding-left: 10px; overflow: scroll;">
     <canvas id="pjs"></canvas>
     {{view Main.NotifyOnLoadView targetBinding="Main.controller" action="resizeSidebar"}}
-    {{#view CodingSupport.CallStackView controllerBinding="Main.controller"}}
-      {{#if view.isRunning}}
-        <pre>
-{{#each frame in view.callstackMembers}}{{frame.text}}{{/each}}</pre>
-      {{/if}}
-    {{/view}}
     <h3>Programming Syntax Cheat Sheet</h3>
     <h4>Naming &amp; updating</h4>
     <p>Create a new name:
@@ -170,8 +186,8 @@ This code tells Rudy to go down as long as the square Rudy is currently on is bl
     <p>To define the <em>repeat</em> function:
       <pre style="color: #d14;">function repeat(n, direction) {
   while (n > 0) {
-    n = n - 1;
     direction();
+    n = n - 1;
   }
 }</pre>
 The previous example, <code>repeat(5, down)</code>, sets <code>n = 5</code> and <code>direction = down</code> inside the body of the <em>repeat</em> function.

@@ -10,7 +10,7 @@ var db = require('./db');
 var helpers = require('./helpers');
 var codeutils = require('./codeutils');
 
-var port = process.env.PORT || 8080;
+var port = process.env.PORT || 8000;
 
 var app = express.createServer();
 var io = require('socket.io').listen(app, {'log level': 1});

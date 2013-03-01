@@ -37,15 +37,15 @@ JSEvaluator.Scope = Em.Object.extend({
   },
   declareValue: function(name, value) {
     this.get('variables').set(name, value);
-    this.get('definedVariables').set(name, true);
+    this.get('definedVariables').pushObject(name);
 
     this.get('interpreter').noteEvent('declareValue', this, name, value);
     // console.log("declaring variable", name, "with initial value", value);
   },
   updateValue: function(name, value) {
-    if (this.get('definedVariables').get(name) || ! this.get('parent')) {
+    if (this.get('definedVariables').contains(name) || ! this.get('parent')) {
       this.get('variables').set(name, value);
-      this.get('definedVariables').set(name, true);
+      this.get('definedVariables').pushObject(name);
 
       this.get('interpreter').noteEvent('updateValue', this, name, value);
     } else {
@@ -79,7 +79,7 @@ JSEvaluator.Scope = Em.Object.extend({
     }    
   },
   getValue: function(name) {
-    if (this.get('definedVariables').get(name)) {
+    if (this.get('definedVariables').contains(name)) {
       return this.get('variables').get(name);
     } else if (this.get('parent')) {
       return this.get('parent').getValue(name);
@@ -89,11 +89,11 @@ JSEvaluator.Scope = Em.Object.extend({
   },
   init: function() {
     this._super();
-    this.set('variables', Em.Object.create()); // no variables set initially...
-    this.set('definedVariables', Em.Object.create());
     if (! this.get('interpreter')) {
       throw new Error('Attempted to create a scope without an interpreter...');
     }
+    this.set('variables', Em.Object.create()); // no variables set initially...
+    this.set('definedVariables', []);
     this.get('interpreter').noteEvent('createScope', this);
   }
 });
@@ -121,16 +121,26 @@ JSEvaluator.Function = JSEvaluator.Object.extend({
   bodyNodes: Em.required(),
   argumentNames: Em.required(),
     
-  call: function(thisPtr, args, cb) {
+  call: function(thisPtr, args, cb, callNode) {
     var scope = this.get('declarationScope').subScope();
     scope.declareValue('this', thisPtr);
     var argNames = this.get('argumentNames').mapProperty('name');
     for (var i = 0; i < Math.min(args.length, argNames.length); ++i) {
       scope.declareValue(argNames[i], args[i]);
     }
+    var interpreter = this.get('declarationScope.interpreter');
+    var callId = interpreter.incrementProperty('functionCallId');
+    interpreter.noteEvent('functionCall', {
+      id: callId,
+      name: this.get('name'),
+      scope: scope,
+      functionObject: this,
+      callNode: callNode
+    });
     this.get('declarationScope.interpreter').evaluateBlock(this.get('bodyNodes'), scope, function(err, val) {
+      interpreter.noteEvent('functionCallDone', callId, err, val);
       if (err === 'return') {
-        console.log("return statement!", err, val);
+        // console.log("return statement!", err, val);
         // swallow a return 'error' created by the return statement.
         cb(null, val);
       } else {
@@ -307,7 +317,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
       }, function(err, val) {
         if (err) { return cb(err, val); }
         // console.log("now calling function", f.get('name'));
-        f.call(thisPtr, evaluatedArgs, cb);
+        f.call(thisPtr, evaluatedArgs, cb, parserNode);
       }, this);
     }    
   },
@@ -315,14 +325,14 @@ JSEvaluator.Interpreter = Em.Object.extend({
     var c = parserNode.children;
     this.assert(c[0].text(), 'return');
     if (c.length == 2) { // return;
-      console.log("naked return");
+      // console.log("naked return");
       return cb('return');
     }
     this.evaluate(c[1], scope, function(err, val) {
       if (err) {
         return cb(err, val);
       }
-      console.log("return with value", val);
+      // console.log("return with value", val);
       cb('return', val);
     });
   },
@@ -338,7 +348,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   evaluateBracket: function(parserNode, scope, cb) {
     this.getBaseAndKey(parserNode, scope, function(err, bk) {
       if (err) {
-        return cb(err, val);
+        return cb(err, bk);
       }
       cb(null, bk.value);
     });
@@ -804,6 +814,9 @@ JSEvaluator.Interpreter = Em.Object.extend({
   convertPositionToLineCh: function(pos) {
     return {start: this.getLineCh(pos.start), end: this.getLineCh(pos.end) };
   },
+  getNodeLineCh: function(node) {
+    return this.convertPositionToLineCh(this.getNodePosition(node));
+  },
   getNodeText: function(node) {
     var pos = this.getNodePosition(node);
     return this.get('currentCode').substring(pos.start, pos.end);
@@ -812,16 +825,18 @@ JSEvaluator.Interpreter = Em.Object.extend({
   breakPeriod: 50,
   evaluationDelay: 0,
   evaluateCallId: 0,
+  functionCallId: 0,
   evaluate: function(parserNode, scope, cb) {
     var self = this;
     var setBreak = false;
     if (! this.get('evaluationDelay')) {
-      if (! this.get('nextBreak')) {
-        setBreak = true;
-        this.set('nextBreak', Date.now() + this.get('breakPeriod'));
-      } else if (Date.now() > this.get('nextBreak')) {
+      if (! this.get('blockStartTime')) {
+        setBlockTime = true;
+        this.set('blockStartTime', Date.now());
+      } else if (Date.now() > this.get('blockStartTime') + this.get('breakPeriod')) {
+        console.log("taking a break...");
         setTimeout(function() {
-          self.set('nextBreak', Date.now() + self.get('breakPeriod'));
+          self.set('blockStartTime', Date.now());
           self.evaluate(parserNode, scope, cb);
         }, 0);
         return;
@@ -849,9 +864,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
       return cb(e);
     }
     var callId = this.incrementProperty('evaluateCallId')
-    this.noteEvent('evaluationStart', callId, parserNode.name, {
-      start: startLineCol, end: endLineCol, pos: nodePosition
-    }, scope);
+    this.noteEvent('evaluationStart', callId, parserNode, scope);
     var ed = self.get('evaluationDelay');
     if (ed) {
       setTimeout(function() {
@@ -862,12 +875,10 @@ JSEvaluator.Interpreter = Em.Object.extend({
     }
     function ecb(err, val) {
       // console.log("Evaluating", self.getNodeText(parserNode), "which evaluates to", val);
-      self.noteEvent('evaluationEnd', callId, parserNode.name, {
-        start: startLineCol, end: endLineCol, pos: nodePosition
-      }, {err: err, val: val});
+      self.noteEvent('evaluationEnd', callId, parserNode, scope, err, val);
       cb.call(self, err, val);
-      if (setBreak) {
-        self.set('nextBreak', undefined);
+      if (setBlockTime) {
+        self.set('blockStartTime', undefined);
       }
     }
     function doEvaluation() {
@@ -1029,7 +1040,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
     this.set('currentCode', code);
     var parser = new JSParser(code, {});
     var syntaxTree = parser.getSyntaxTree();
-    console.log("tree", syntaxTree);
+    // console.log("tree", syntaxTree);
     this.set('state', 'running');
     this.evaluate(syntaxTree, scope || this.get('globalScope'), function(e) {
       this.set('state', 'stopped');

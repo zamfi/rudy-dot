@@ -1,6 +1,7 @@
 <!doctype html>
 <html>
   <head>
+    <meta charset="utf-8">
     <title>CodeMirror: Active Line Demo</title>
     <link rel="stylesheet" href="../lib/codemirror.css">
     <script src="../lib/codemirror.js"></script>
@@ -57,13 +58,16 @@
 var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
   mode: "application/xml",
   lineNumbers: true,
-  lineWrapping: true,
-  onCursorActivity: function() {
-    editor.setLineClass(hlLine, null, null);
-    hlLine = editor.setLineClass(editor.getCursor().line, null, "activeline");
+  lineWrapping: true
+});
+var hlLine = editor.addLineClass(0, "background", "activeline");
+editor.on("cursorActivity", function() {
+  var cur = editor.getLineHandle(editor.getCursor().line);
+  if (cur != hlLine) {
+    editor.removeLineClass(hlLine, "background", "activeline");
+    hlLine = editor.addLineClass(cur, "background", "activeline");
   }
 });
-var hlLine = editor.setLineClass(0, "activeline");
 </script>
 
     <p>Styling the current cursor line.</p>

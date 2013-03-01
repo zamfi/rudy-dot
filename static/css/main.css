@@ -10,24 +10,31 @@ body {
   padding: 10px;
 }
 
-.codemirror pre.line-warning {
+.line-warning {
+  background: #fcc;
+}
+.line-warning .CodeMirror-gutter-elt {
+  color: red; 
+  font-weight: bold;
   background: #fcc;
 }
 
-.codemirror pre.gutter-warning {
+.gutter-warning {
+  width: 8px;
   color: red;
   font-weight: bold;
 }
 
 .callout {
   position: absolute;
-  margin-top: 7px;
+  margin-top: 20px;
   background: #fee;
   padding: 5px;
   border: 1px solid #fcc;
   margin-left: -10px;
   border-radius: 6px;
   box-shadow: 3px 3px 4px #cbb;
+  z-index: 100;
 }
 .callout .notch {
   position: absolute;
@@ -45,6 +52,16 @@ body {
   padding-left: 10px;
   font-size: 16px;
   line-height: 12px;
+}
+
+.arrows {
+  display: inline-block; 
+  font-size: 10px; 
+  line-height: 12px; 
+  vertical-align: middle;
+}
+.arrows a:active, .arrows a:hover {
+  text-decoration: inherit;
 }
 
 .slider {

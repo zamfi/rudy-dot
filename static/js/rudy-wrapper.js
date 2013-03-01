@@ -8,6 +8,7 @@
     return function(processing) {
       with (processing) {
         function runUserCode(cb) {
+          if (userCode == "") { return cb(); }
           var interpreter = window.JSEvaluator.Interpreter.create({
             builtIns: {
               right: {type: "async-function", underlying: right},
@@ -31,10 +32,10 @@
                 });
               } else if (err.errorType == "stopped") {
                 processing.noLoop();
-                passEvent("runtimeError", {
-                  line: err.startPos.line+1, char: err.startPos.col,
-                  msg: "Interpreter stopped."
-                });
+                // passEvent("runtimeError", {
+                //   line: err.startPos.line+1, char: err.startPos.col,
+                //   msg: "Interpreter stopped."
+                // });
               } else {
                 console.log(err);
                 processing.noLoop();
@@ -80,62 +81,62 @@
         }
  
         var coloring = function() {
-            if (! level.colors) { return false; }
-            var c = level.colors.contains(position.x, position.y);
-            return c ? c.hue : false;
+          if (! level.colors) { return false; }
+          var c = level.colors.contains(position.x, position.y);
+          return c ? c.hue : false;
         }
         var remainingDots = function() {
-            return level ? level.dots.list.length - level.dots.count("found", true) : 0;
+          return level ? level.dots.list.length - level.dots.count("found", true) : 0;
         }
  
         function level3() {
-            var holes = [5];
-            for (var i = 1; i <= 3; ++i) {
-                holes.push(holes[i-1]+(Math.random()<0.5 ? -1 : 1));
-            }
-            var start = 1;
-            var obstacles = new PositionSet([]);
-            var colors = new PositionSet([]);
-            for (var i = 0; i < holes.length; ++i) {
-                obstacles = obstacles
-                    .concat(makeObstacles(start+i*2, 0, 1, holes[i]))
-                    .concat(makeObstacles(start+i*2, holes[i]+1, 1, (9-holes[i])));
-                if (i > 0) {
-                    colors.push({x: (start-1)+i*2, y: holes[i-1], hue: holes[i] < holes[i-1] ? "red" : "blue"});
-                }
-            }
-            var ret = {
-                start: { x: 0, y: 5 },
-                dots: new PositionSet([ { x:9, y: holes[holes.length-1] } ]),
-                obstacles: obstacles,
-                colors: colors
-            };
-            return ret;    
+          var holes = [5];
+          for (var i = 1; i <= 3; ++i) {
+              holes.push(holes[i-1]+(Math.random()<0.5 ? -1 : 1));
+          }
+          var start = 1;
+          var obstacles = new PositionSet([]);
+          var colors = new PositionSet([]);
+          for (var i = 0; i < holes.length; ++i) {
+              obstacles = obstacles
+                  .concat(makeObstacles(start+i*2, 0, 1, holes[i]))
+                  .concat(makeObstacles(start+i*2, holes[i]+1, 1, (9-holes[i])));
+              if (i > 0) {
+                  colors.push({x: (start-1)+i*2, y: holes[i-1], hue: holes[i] < holes[i-1] ? "red" : "blue"});
+              }
+          }
+          var ret = {
+              start: { x: 0, y: 5 },
+              dots: new PositionSet([ { x:9, y: holes[holes.length-1] } ]),
+              obstacles: obstacles,
+              colors: colors
+          };
+          return ret;    
         }
  
         function level4() {
-            var holes = [
-                Math.floor(Math.random()*5+5),
-                Math.floor(Math.random()*5),
-                Math.floor(Math.random()*5+5),
-                Math.floor(Math.random()*5) 
-            ];
-            var start = 1;
-            var obstacles = new PositionSet([]);
-            var colors = new PositionSet([{x:8, y:9, hue:"red"}]);
-            for (var i = 0; i < holes.length; ++i) {
-                obstacles = obstacles
-                    .concat(makeObstacles(start+i*2, 0, 1, holes[i]))
-                    .concat(makeObstacles(start+i*2, holes[i]+1, 1, (9-holes[i])));
-                colors.push({x: (start-1)+i*2, y: holes[i], hue: "red"});
-            }
-            var ret = {
-                start: { x: 0, y: 0 },
-                dots: new PositionSet([ { x:9, y: 9 } ]),
-                obstacles: obstacles,
-                colors: colors
-            };
-            return ret;
+          var holes = [
+              Math.floor(Math.random()*5+5),
+              Math.floor(Math.random()*5),
+              Math.floor(Math.random()*5+5),
+              Math.floor(Math.random()*5) 
+          ];
+          var start = 1;
+          var obstacles = new PositionSet([]);
+          var colors = new PositionSet([{x:8, y:9, hue:"red"}]);
+          for (var i = 0; i < holes.length; ++i) {
+              obstacles = obstacles
+                  .concat(makeObstacles(start+i*2, 0, 1, holes[i]))
+                  .concat(makeObstacles(start+i*2, holes[i]+1, 1, (9-holes[i])));
+              colors.push({x: (start-1)+i*2, y: holes[i], hue: "red"});
+          }
+          var ret = {
+              start: { x: 0, y: 0 },
+              dots: new PositionSet([ { x:9, y: 9 } ]),
+              obstacles: obstacles,
+              colors: colors
+          };
+          return ret;
         }
     
         function level5() {
@@ -211,7 +212,7 @@
         var overlayText = null;
         var moveStart = -MOVETIME;
         var runCommand = function(op, cb) {
-          console.log("running command:", op);
+          // console.log("running command:", op);
           var newPos = applyCommand(op);
           if (newPos) {
             nextPosition = newPos;

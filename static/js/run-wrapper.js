@@ -35,13 +35,15 @@
           _size(x,y);
           updateWidth(x);
         }
-        eventHandler.start({ stop: function() { 
-          window.__ck_kill = true;
-          if (processingInstance) {
-            processingInstance.noLoop();
-          }
-          eventHandler.stop();
-        }});
+        if (eventHandler.start) {
+          eventHandler.start({ stop: function() { 
+            window.__ck_kill = true;
+            if (processingInstance) {
+              processingInstance.noLoop();
+            }
+            eventHandler.stop();
+          }});
+        }
         try {
           eval(userCode);
           if (draw == _draw) {
@@ -52,7 +54,9 @@
           if (processingInstance) {
             processingInstance.noLoop();
           }
-          eventHandler.stop();
+          if (eventHandler.stop) {
+            eventHandler.stop();
+          }
           console.log(userCode, e);
         }
       }

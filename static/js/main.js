@@ -137,17 +137,18 @@ window.CodingSupport = Em.Namespace.create({
         tabSize: 2,
         lineNumbers: true,
         indentWithTabs: false,
-        // extraKeys: { "Tab": "IndentAuto" },
-        onChange: function() {
-          if (self.get('controller').noteCodeChange) {
-            self.get('controller').noteCodeChange();
-          }
-        }
+        gutters: ['gutter-warning']
+        // extraKeys: { "Tab": "IndentAuto" }
       });
+      codeArea.on('change', function() {
+        if (self.get('controller').noteCodeChange) {
+          self.get('controller').noteCodeChange();
+        }        
+      })
       this.set('codeArea', codeArea);
 
       if (this.get('autoResize')) {
-        CodeMirror.connect(window, 'resize', function() { self.resizeCodeMirror(); });
+        CodeMirror.on(window, 'resize', function() { self.resizeCodeMirror(); });
         this.resizeCodeMirror();        
       }
       
@@ -179,10 +180,10 @@ window.CodingSupport = Em.Namespace.create({
     },
     
     resizeCodeMirror: function() {
-      var codeArea = this.get('codeArea');
+      var codeArea = $('.CodeMirror'); //this.get('codeArea');
       var winHeight = window.innerHeight || (document.documentElement || document.body).clientHeight;
-      codeArea.getScrollerElement().style.height = (winHeight - 60) + " px";
-      codeArea.refresh();
+      codeArea.css({height: (winHeight - 60) + " px"});
+      // codeArea.refresh();
     },
     
     initialCode: "// Your code here.",
@@ -192,9 +193,10 @@ window.CodingSupport = Em.Namespace.create({
     clearErrors: function() {
       this.$('.errorbox').remove();
       var codeArea = this.get('codeArea')
+      codeArea.clearGutter('gutter-warning');
       this.get('markedLines').forEach(function(lineHandle) {
-        codeArea.setLineClass(lineHandle, null, null);
-        codeArea.clearMarker(lineHandle);
+        codeArea.removeLineClass(lineHandle, 'wrap');
+        // codeArea.clearMarker(lineHandle);
       });
       this.set('markedLines', []);
     },
@@ -211,8 +213,8 @@ window.CodingSupport = Em.Namespace.create({
           return; // don't print these.
         }
         
-        var lineHandle = codeArea.setMarker(error.line-1, '%N%', 'gutter-warning');
-        codeArea.setLineClass(lineHandle, null, 'line-warning');
+        codeArea.setGutterMarker(error.line-1, 'gutter-warning', $('<i class="icon-exclamation-sign icon-warning"></i>').get()[0]);
+        var lineHandle = codeArea.addLineClass(error.line-1, 'wrap', 'line-warning');
         markedLines.push(lineHandle);
         return suppressBoxes ? Em.K : this.showErrorBox(error.line-1, error.character-1||1, error.reason);
       }, this);
@@ -222,6 +224,7 @@ window.CodingSupport = Em.Namespace.create({
       });
     },
     showErrorBox: function(line, character, msg) {
+      console.log("errorbox!", line, character, msg);
       var codeArea = this.get('codeArea');
       return function() {
         var box = $('<div class="callout errorbox">');
@@ -239,15 +242,15 @@ window.CodingSupport = Em.Namespace.create({
     controller: null
   }),
   
-  CallStackView: Em.View.extend({
+  EvalstackView: Em.View.extend({
     controller: Em.required(),
     isRunning: function() {
       return this.get('controller.state') == 'running';
     }.property('controller.state'),
-    callstackBinding: "controller.callstack",
-    callstackMembers: function() {
-      return this.get('callstack').filterProperty('visible', true);
-    }.property('callstack.[]')
+    evalstackBinding: "controller.evalstack",
+    evalstackMembers: function() {
+      return this.get('evalstack').filterProperty('visible', true);
+    }.property('evalstack.[]')
   }),
   
   ScopesView: Em.View.extend({
@@ -263,6 +266,33 @@ window.CodingSupport = Em.Namespace.create({
     keys: function() {
       
     }.property('scope.definedVariables.[]')
+  }),
+  
+  FunctionCallView: Em.View.extend({
+    templateName: "function-call-view",
+    scopes: null,
+    functionObject: Em.required(),
+    argList: function() {
+      return this.get('functionObject.argumentNames').join(", ");
+    }.property('functionObject.argumentNames.[]'),
+    code: function() {
+      return "  // function code";
+    }.property("functionObject.bodyNodes.[]"),
+    init: function() {
+      this._super();
+      this.set('scopes', []);
+    }
+  }),
+  ScopeAttributeView: Em.View.extend({
+    tagName: "span",
+    className: "scope-attribute",
+    scope: Em.required(),
+    key: Em.required(),
+    init: function() {
+      this._super();
+      console.log("Scope attribute view created!");
+      Em.oneWay(this, "value", "scope."+this.get('key'));
+    }
   }),
   
   CodeController: Em.Object.extend({
@@ -340,40 +370,123 @@ window.CodingSupport = Em.Namespace.create({
         runController.stop();
       }
     },
-    startHandler: function(control) {
+    startHandler: function(interpreter) {
+      this.set('evalstack', []);
       this.set('callstack', []);
-      this.set('runController', control);
+      this.set('runController', interpreter);
       this.set('state', 'running');
     },
     stopHandler: function() {
       this.set('runController', null);
       this.set('state', 'stopped');
     },
-    evaluationStartHandler: function(callId, nodeType, pos) {
+    statementTypes: {
+      'whileStmnt': {ignore: true},
+      'blockStmnt': {ignore: true},
+      'ifStmnt': {ignore: true},
+      'forStmnt': {ignore: true},
+      'functionExpr': {ignore: true},
+      'functionDecl': {ignore: true}
+    },
+    functionCallHandler: function(options) {
+      var interpreter = this.get('runController');
+      var nodeLineCh = interpreter.getNodeLineCh(options.callNode);
+
+      var lineWidget = this.get('codeArea').lineInfo(nodeLineCh.start.line).widgets;
+      var lineWidgetIsNew = false;
+      if (! lineWidget || lineWidget.length == 0) {
+        lineWidgetIsNew = true;
+        lineWidget = this.get('codeArea').addLineWidget(nodeLineCh.start.line, $('<span>')[0]);
+      } else {
+        lineWidget = lineWidget[0];
+      }
+      var widgetView;
+      if (! (widgetView = $(lineWidget.node).data('widgetView'))) {
+        widgetView = CodingSupport.FunctionCallView.create({
+          functionObject: options.functionObject
+        });
+        widgetView.appendTo(lineWidget);
+      }
+      console.log("widgetView", widgetView);
+      widgetView.get('scopes').pushObject(options.scope);
+      options.scope.addObserver('definedVariables.[]', lineWidget, 'changed');
+      this.get('callstack').pushObject({
+        callId: options.id,
+        scopes: widgetView.get('scopes'),
+        lineWidget: lineWidgetIsNew ? lineWidget : null
+      });
+    },
+    functionCallEndHandler: function(callId, err, val) {
+      var obj = this.get('callstack').popObject();
+      if (obj.callId != callId) {
+        throw new Error("function call ids don't match! expected "+callId+" was "+obj.callId);
+      }
+      if (obj.lineWidget) {
+        obj.lineWidget.data('widgetView').get('scopes').forEach(function(scope) { scope.removeObserver('definedVariables.[]', obj.lineWidget, 'changed')});
+        obj.lineWidget.clear();
+      }
+    },
+    evaluationStartHandler: function(callId, node, scope) {
+      var nodeType = node.name;
       if (nodeType == 'program') { return; }
       var padding = "";
-      var n = this.get('callstack').length;
-      while (n--) {
-        padding += " ";
-      }
-      console.log("evaluating", padding, nodeType, pos);
-      var mark = this.get('codeArea').markText(pos.start, pos.end, 'eval'+this.get('callstack').length);
-      this.get('callstack').pushObject({
+      var interpreter = this.get('runController');
+      var nodeLineCh = interpreter.getNodeLineCh(node);
+      var oldText = this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end);
+
+      // var n = this.get('evalstack').length;
+      // while (n--) {
+      //   padding += " ";
+      // }
+      // console.log("evaluating", padding, oldText, "("+nodeType+")", nodeLineCh);
+
+      var mark = this.get('codeArea').markText(nodeLineCh.start, nodeLineCh.end, {className:'eval'+this.get('evalstack').length});
+
+      this.get('evalstack').pushObject({
         id: callId,
         visible: (nodeType == 'call' || nodeType == 'whileStmnt'),
-        pos: pos,
-        text: this.get('codeArea').getRange(pos.start, pos.end)+"\n",
+        pos: nodeLineCh,
+        text: this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end)+"\n",
         mark: mark
       });
     },
-    evaluationEndHandler: function(callId, nodeType, pos, ret) {
+    evaluationEndHandler: function(callId, node, scope, err, val) {
+      var nodeType = node.name;
       if (nodeType == 'program') { return; }
-      var cs = this.get('callstack');
+      var cs = this.get('evalstack');
       if (cs[cs.length-1].id != callId) {
         console.log("wtf?", callId, cs[cs.length-1].id);
         return;
       }
+      var padding = "";
+      var n = this.get('evalstack').length;
+      while (n--) {
+        padding += " ";
+      }
+
+      // console.log("eval --> ", padding, val);
+
       cs.popObject().mark.clear();
+      // var interpreter = this.get('runController');
+      // var nodePosition = interpreter.getNodePosition(node);
+      // var nodeLineCh = interpreter.convertPositionToLineCh(nodePosition);
+      // 
+      // var lineWidget = this.get('codeArea').lineInfo(nodeLineCh.start.line).widgets;
+      // if (! lineWidget || lineWidget.length == 0) {
+      //   lineWidget = this.get('codeArea').addLineWidget(nodeLineCh.start.line, $('<span>')[0]);
+      // } else {
+      //   lineWidget = lineWidget[0];
+      // }
+      // var widgetNode = $(lineWidget.node);
+      // var oldText = this.get('codeArea').getRange({line: nodeLineCh.start.line, ch:0}, {line: nodeLineCh.end.line+1, ch:0});
+      // if (val === undefined) {
+      //   return;
+      // }
+      // var newText = oldText.substr(0, nodeLineCh.start.ch) + val + oldText.substr(nodeLineCh.end.ch);
+      // 
+      // // console.log("old text is", oldText, nodeLineCh, nodePosition);
+      // // console.log("new text is", newText, val);
+      // widgetNode.append(newText+"<br>");
     },
     scopes: [],
     createScopeHandler: function(scope) {
