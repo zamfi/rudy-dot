@@ -1,0 +1,12 @@
+<script type="text/x-handlebars" data-template-name="function-call-view">
+  <div class="function-code">function {{view.functionObject.name}}({{view.argList}}) {
+{{view.code}}
+}</div>
+  {{#each scope in view.scopes}}
+    <div class="function-scope">
+      {{#each key in scope.definedVariables}}
+        {{#view CodingSupport.ScopeAttributeView key=key scope=scope }}<em>{{view.key}}</em>: <strong>{{view.value}}</strong>{{/view}}
+      {{/each}}
+    </div>
+  {{/each}}
+</script>

@@ -13,7 +13,7 @@ var codeutils = require('./codeutils');
 var port = process.env.PORT || 8000;
 
 var app = express.createServer();
-var io = require('socket.io').listen(app, {'log level': 1});
+// var io = require('socket.io').listen(app, {'log level': 1});
 
 var logStream;
 try {
@@ -53,11 +53,47 @@ app.get('/', function(req, res, next) {
   res.render('home.html');
 });
 
-app.get('/new/:template?/:args?', function(req, res, next) {
+var argHandler = {
+  rudy: function(doc, args, cb) {
+    if ('cloneCode' in args) {
+      await db.in('sketches').get(args.cloneCode, defer (var err, oldDoc));
+      if (err) { return cb(err); }
+      doc.latestCode = oldDoc.latestCode;
+      doc.versions.push(oldDoc.versions[oldDoc.versions.length-1]);
+      if (!doc.extra) {doc.extra = {};}
+      doc.extra.clonedFrom = args.cloneCode;
+    }
+    ['level', 'evaluationDelay'].forEach(function(k) {
+      if (k in args) {
+        if (!doc.extra) {doc.extra = {};}
+        doc.extra[k] = args[k];
+      }
+    });
+    cb(null, ('cloneCode' in args) ? function(doc, cb) {
+      db.in('sketches').update(args.cloneCode, {'$set': {'extra.clonedTo': doc._id}}, cb);
+    } : undefined);
+  }
+};
+
+app.get('/new/:template?', function(req, res, next) {
   var template = req.params.template || 'run';
-  await db.in('sketches').create({latestCode: savedCode[template].d, versions: [savedCode[template]]}, defer (var err, doc));
+  var newDoc = {latestCode: savedCode[template].d, versions: [savedCode[template]]};
+  var err, followup_f;
+  if (template in argHandler) {
+    await argHandler[template](newDoc, req.query, defer (err, followup_f));
+    if (err) {
+      return res.render('500.html', {err: err});
+    }
+  }
+  await db.in('sketches').create(newDoc, defer (var err, doc));
   if (err) {
     return res.render('500.html', {err: err});
+  }
+  if (followup_f) {
+    await followup_f(doc, defer (var err));
+    if (err) {
+      return res.render('500.html', {err: err});
+    }
   }
   res.redirect('/edit/'+template+'/'+doc._id);
 });
@@ -94,7 +130,7 @@ app.post('/save/:sketchId', function(req, res, next) {
     $set: { latestCode: code }
   };
   if (req.param('extra')) {
-    updateParams['$set'].extra = req.param('extra');
+    updateParams['$set'].extra = JSON.parse(req.param('extra'));
   }
   if (saveVersion) {
     updateParams['$push'] = { versions: {d: code, i: instrumentedCode }};
@@ -195,16 +231,16 @@ app.get('/play/:template/:id/:version', function(req, res, next) {
 });
 
 // set up runtime error handling
-var socketRegistrations = {};
-io.sockets.on('connection', function(socket) {
-  var id;
-  socket.on('register', function(data) {
-    socketRegistrations[id = data.id] = socket;
-  });
-  socket.on('disconnect', function() {
-    delete socketRegistrations[id];
-  });
-});
+// var socketRegistrations = {};
+// io.sockets.on('connection', function(socket) {
+//   var id;
+//   socket.on('register', function(data) {
+//     socketRegistrations[id = data.id] = socket;
+//   });
+//   socket.on('disconnect', function() {
+//     delete socketRegistrations[id];
+//   });
+// });
 app.post('/runtimeError', function(req, res, next) {
   var id = req.param('id');
   if (socketRegistrations[id]) {
@@ -214,25 +250,27 @@ app.post('/runtimeError', function(req, res, next) {
 });
 
 // set up sharejs
-var sharejs = require('share');
-var options = {
-  db: {type: 'mongo'},
-  browserChannel: {cors: '*'},
-  auth: function(client, action) {
-		// This auth handler rejects any ops bound for docs starting with 'readonly'.
-    if (action.name === 'submit op' && action.docName.match(/^readonly/)) {
-      action.reject();
-    } else {
-      action.accept();
-    }
-  }
-};
-var sharejsServer = sharejs.server.attach(app, options);
+// var sharejs = require('share');
+// var options = {
+//   db: {type: 'mongo'},
+//   browserChannel: {cors: '*'},
+//   auth: function(client, action) {
+// 		// This auth handler rejects any ops bound for docs starting with 'readonly'.
+//     if (action.name === 'submit op' && action.docName.match(/^readonly/)) {
+//       action.reject();
+//     } else {
+//       action.accept();
+//     }
+//   }
+// };
+// var sharejsServer = sharejs.server.attach(app, options);
 
 // and now, if nothing hits...
 app.use(function(req, res) {
   res.render('404.html', 404);
 });
+
+console.log("setup completed.");
 
 // error handling
 process.on('uncaughtException', function(err) {

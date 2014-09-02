@@ -10,9 +10,9 @@
     "connect": "~1",
     "express": "~2",
     "ejs": "*",
-    "mongodb": "*",
+    "mongodb": "~1.1.2",
     "tamejs": "~0.4.9",
-    "socket.io": "*",
+    "socket.io": "~0.9.9",
     "share": "git://github.com/zamfi/ShareJS"
   },
   "scripts": { "start": "node main.js" },

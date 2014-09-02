@@ -1,5 +1,5 @@
 var mongodb = require('mongodb');
-var client = new mongodb.Db('rudy', new mongodb.Server("127.0.0.1", 27017, {auto_reconnect: true}));
+var client = new mongodb.Db('rudy', new mongodb.Server("127.0.0.1", 27017, {auto_reconnect: true}), {safe: true});
 
 var debug = false;
 var log = debug ? function() { log.apply(log, arguments); } : function() {};

@@ -285,6 +285,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
         });
         break;
       case 'identifier':
+      case 'call':
         this.evaluate(functionNode, scope, function(err, val) {
           if (err) { return cb(err, val); }
           withFunction.call(this, null, val);
@@ -828,7 +829,7 @@ JSEvaluator.Interpreter = Em.Object.extend({
   functionCallId: 0,
   evaluate: function(parserNode, scope, cb) {
     var self = this;
-    var setBreak = false;
+    var setBlockTime = false;
     if (! this.get('evaluationDelay')) {
       if (! this.get('blockStartTime')) {
         setBlockTime = true;

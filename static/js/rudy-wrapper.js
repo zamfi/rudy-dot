@@ -226,7 +226,7 @@
               }
               if (remainingDots() == 0) {
                 if (levelNum < levels.length) {
-                  passEvent("levelUnlock", levelNum+2);                  
+                  passEvent("levelCompleted", levelNum+1);                  
                 }
                 overlayText = "LEVEL "+(levelNum+1)+"\nCLEARED";
               }

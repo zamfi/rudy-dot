@@ -182,7 +182,7 @@ window.CodingSupport = Em.Namespace.create({
     resizeCodeMirror: function() {
       var codeArea = $('.CodeMirror'); //this.get('codeArea');
       var winHeight = window.innerHeight || (document.documentElement || document.body).clientHeight;
-      codeArea.css({height: (winHeight - 60) + " px"});
+      codeArea.css('height', (winHeight - 60));
       // codeArea.refresh();
     },
     
@@ -242,58 +242,58 @@ window.CodingSupport = Em.Namespace.create({
     controller: null
   }),
   
-  EvalstackView: Em.View.extend({
-    controller: Em.required(),
-    isRunning: function() {
-      return this.get('controller.state') == 'running';
-    }.property('controller.state'),
-    evalstackBinding: "controller.evalstack",
-    evalstackMembers: function() {
-      return this.get('evalstack').filterProperty('visible', true);
-    }.property('evalstack.[]')
-  }),
-  
-  ScopesView: Em.View.extend({
-    controller: Em.required(),
-    isRunning: function() {
-      return this.get('controller.state') == 'running';
-    }.property('controller.state'),
-    scopesBinding: 'controller.scopes'
-  }),
-  
-  ScopeView: Em.View.extend({
-    scope: Em.required(),
-    keys: function() {
-      
-    }.property('scope.definedVariables.[]')
-  }),
-  
-  FunctionCallView: Em.View.extend({
-    templateName: "function-call-view",
-    scopes: null,
-    functionObject: Em.required(),
-    argList: function() {
-      return this.get('functionObject.argumentNames').join(", ");
-    }.property('functionObject.argumentNames.[]'),
-    code: function() {
-      return "  // function code";
-    }.property("functionObject.bodyNodes.[]"),
-    init: function() {
-      this._super();
-      this.set('scopes', []);
-    }
-  }),
-  ScopeAttributeView: Em.View.extend({
-    tagName: "span",
-    className: "scope-attribute",
-    scope: Em.required(),
-    key: Em.required(),
-    init: function() {
-      this._super();
-      console.log("Scope attribute view created!");
-      Em.oneWay(this, "value", "scope."+this.get('key'));
-    }
-  }),
+  // EvalstackView: Em.View.extend({
+  //   controller: Em.required(),
+  //   isRunning: function() {
+  //     return this.get('controller.state') == 'running';
+  //   }.property('controller.state'),
+  //   evalstackBinding: "controller.evalstack",
+  //   evalstackMembers: function() {
+  //     return this.get('evalstack').filterProperty('visible', true);
+  //   }.property('evalstack.[]')
+  // }),
+  // 
+  // ScopesView: Em.View.extend({
+  //   controller: Em.required(),
+  //   isRunning: function() {
+  //     return this.get('controller.state') == 'running';
+  //   }.property('controller.state'),
+  //   scopesBinding: 'controller.scopes'
+  // }),
+  // 
+  // ScopeView: Em.View.extend({
+  //   scope: Em.required(),
+  //   keys: function() {
+  //     
+  //   }.property('scope.definedVariables.[]')
+  // }),
+  // 
+  // FunctionCallView: Em.View.extend({
+  //   templateName: "function-call-view",
+  //   scopes: null,
+  //   functionObject: Em.required(),
+  //   argList: function() {
+  //     return this.get('functionObject.argumentNames').join(", ");
+  //   }.property('functionObject.argumentNames.[]'),
+  //   code: function() {
+  //     return "  // function code";
+  //   }.property("functionObject.bodyNodes.[]"),
+  //   init: function() {
+  //     this._super();
+  //     this.set('scopes', []);
+  //   }
+  // }),
+  // ScopeAttributeView: Em.View.extend({
+  //   tagName: "span",
+  //   className: "scope-attribute",
+  //   scope: Em.required(),
+  //   key: Em.required(),
+  //   init: function() {
+  //     this._super();
+  //     console.log("Scope attribute view created!");
+  //     Em.oneWay(this, "value", "scope."+this.get('key'));
+  //   }
+  // }),
   
   CodeController: Em.Object.extend({
     validate: function(code, suppressBoxes) {
@@ -330,7 +330,7 @@ window.CodingSupport = Em.Namespace.create({
         saveVersion: saveVersion
       };
       if (this.get('extra')) {
-        data.extra = this.get('extra');
+        data.extra = JSON.stringify(this.get('extra'));
       }
       $.ajax('/save/'+this.get('sketchId'), {
         type: 'post',
@@ -389,6 +389,8 @@ window.CodingSupport = Em.Namespace.create({
       'functionDecl': {ignore: true}
     },
     functionCallHandler: function(options) {
+      return;
+      
       var interpreter = this.get('runController');
       var nodeLineCh = interpreter.getNodeLineCh(options.callNode);
 
@@ -417,6 +419,8 @@ window.CodingSupport = Em.Namespace.create({
       });
     },
     functionCallEndHandler: function(callId, err, val) {
+      return;
+      
       var obj = this.get('callstack').popObject();
       if (obj.callId != callId) {
         throw new Error("function call ids don't match! expected "+callId+" was "+obj.callId);
