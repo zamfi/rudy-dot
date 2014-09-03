@@ -1,9 +1,11 @@
 <script type="text/javascript" src="/js/processing-1.3.6.js"></script>
 <script type="text/javascript" src="/js/jslint.js"></script>
 <script type="text/javascript" src="/js/evaluator.js"></script>
+<script type="text/javascript" src="/js/JS-Interpreter/acorn.js"></script>
+<script type="text/javascript" src="/js/JS-Interpreter/interpreter.js"></script>
 <script type="text/javascript" src="/js/main.js"></script>
 <script type="text/javascript" src="/js/rudy-wrapper.js"></script>
-<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<!-- <script type="text/javascript" src="/socket.io/socket.io.js"></script> -->
 <script type="text/javascript" src="/js/jsparse/lexer.js"></script>
 <script type="text/javascript" src="/js/jsparse/parserlib.js"></script>
 <script type="text/javascript" src="/js/jsparse/stringify.js"></script>
@@ -23,11 +25,12 @@
       
       level: <%= extra ? extra.level : 1 %>,
       
-      runtimeErrorHandler: function(errorObject) {
+      runtimeErrorHandler: function(error, frame, stack) {
+        var pos = this.get('codeMirrorView.codeArea').posFromIndex(frame.node.start);
         this.get('codeMirrorView').markErrors([{
-          line: errorObject.line,
-          character: errorObject.char,
-          reason: errorObject.msg
+          line: pos.line+1,
+          character: pos.char,
+          reason: "Runtime error: "+(error.getMessage ? error.getMessage() : String(error))
         }]);
       },
       
@@ -202,16 +205,16 @@ The previous example, <code>repeat(5, down)</code>, sets <code>n = 5</code> and 
 
 <script>
 $(function() {
-  var socket = io.connect();
-  socket.on('connect', function() {
-    socket.emit('register', {id: Main.controller.get('clientId')});
-  });
-  socket.on('runtime error', function(data) {
-    console.log("runtime error!", data);
-    Main.controller.get('codeMirrorView').markErrors([
-      { line: data.line, character: data.char, reason: data.msg }
-    ]);
-  });
+  // var socket = io.connect();
+  // socket.on('connect', function() {
+  //   socket.emit('register', {id: Main.controller.get('clientId')});
+  // });
+  // socket.on('runtime error', function(data) {
+  //   console.log("runtime error!", data);
+  //   Main.controller.get('codeMirrorView').markErrors([
+  //     { line: data.line, character: data.char, reason: data.msg }
+  //   ]);
+  // });
 });
 </script>
 

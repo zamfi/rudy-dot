@@ -37,7 +37,7 @@ window.CodingSupport = Em.Namespace.create({
             predef.down = false;
             predef.coloring = false;
             predef.remainingDots = false;
-            predef.println = false;
+            predef.log = false;
             break;
         }
         this.set('predef', predef);
@@ -357,7 +357,7 @@ window.CodingSupport = Em.Namespace.create({
       if (! this.validate(code)) {
         return;
       }
-      var instrumentedCode = this.get('instrumentor').instrument(code, JSLINT.tree); // JSLINT.tree is set in this.validate.
+      // var instrumentedCode = this.get('instrumentor').instrument(code, JSLINT.tree); // JSLINT.tree is set in this.validate.
       this.doSave(code, true);
       var self = this;
       window.ProcessingWrapper.executeCode(code /* instrumentedCode */, this);
@@ -371,72 +371,79 @@ window.CodingSupport = Em.Namespace.create({
       }
     },
     startHandler: function(interpreter) {
-      this.set('evalstack', []);
-      this.set('callstack', []);
       this.set('runController', interpreter);
       this.set('state', 'running');
     },
-    stopHandler: function() {
+    stopHandler: function(interpreter) {
       this.set('runController', null);
       this.set('state', 'stopped');
-    },
-    statementTypes: {
-      'whileStmnt': {ignore: true},
-      'blockStmnt': {ignore: true},
-      'ifStmnt': {ignore: true},
-      'forStmnt': {ignore: true},
-      'functionExpr': {ignore: true},
-      'functionDecl': {ignore: true}
-    },
-    functionCallHandler: function(options) {
-      return;
-      
-      var interpreter = this.get('runController');
-      var nodeLineCh = interpreter.getNodeLineCh(options.callNode);
-
-      var lineWidget = this.get('codeArea').lineInfo(nodeLineCh.start.line).widgets;
-      var lineWidgetIsNew = false;
-      if (! lineWidget || lineWidget.length == 0) {
-        lineWidgetIsNew = true;
-        lineWidget = this.get('codeArea').addLineWidget(nodeLineCh.start.line, $('<span>')[0]);
-      } else {
-        lineWidget = lineWidget[0];
-      }
-      var widgetView;
-      if (! (widgetView = $(lineWidget.node).data('widgetView'))) {
-        widgetView = CodingSupport.FunctionCallView.create({
-          functionObject: options.functionObject
-        });
-        widgetView.appendTo(lineWidget);
-      }
-      console.log("widgetView", widgetView);
-      widgetView.get('scopes').pushObject(options.scope);
-      options.scope.addObserver('definedVariables.[]', lineWidget, 'changed');
-      this.get('callstack').pushObject({
-        callId: options.id,
-        scopes: widgetView.get('scopes'),
-        lineWidget: lineWidgetIsNew ? lineWidget : null
+      var stateStack = interpreter.stateStack;
+      stateStack.forEach(function(frame) {
+        if (frame.node && frame.node.__extra) {
+          frame.node.__extra.mark.clear();
+        }
       });
     },
-    functionCallEndHandler: function(callId, err, val) {
-      return;
-      
-      var obj = this.get('callstack').popObject();
-      if (obj.callId != callId) {
-        throw new Error("function call ids don't match! expected "+callId+" was "+obj.callId);
-      }
-      if (obj.lineWidget) {
-        obj.lineWidget.data('widgetView').get('scopes').forEach(function(scope) { scope.removeObserver('definedVariables.[]', obj.lineWidget, 'changed')});
-        obj.lineWidget.clear();
-      }
-    },
-    evaluationStartHandler: function(callId, node, scope) {
-      var nodeType = node.name;
-      if (nodeType == 'program') { return; }
+    // statementTypes: {
+    //   'whileStmnt': {ignore: true},
+    //   'blockStmnt': {ignore: true},
+    //   'ifStmnt': {ignore: true},
+    //   'forStmnt': {ignore: true},
+    //   'functionExpr': {ignore: true},
+    //   'functionDecl': {ignore: true}
+    // },
+    // functionCallHandler: function(options) {
+    //   return;
+    //
+    //   var interpreter = this.get('runController');
+    //   var nodeLineCh = interpreter.getNodeLineCh(options.callNode);
+    //
+    //   var lineWidget = this.get('codeArea').lineInfo(nodeLineCh.start.line).widgets;
+    //   var lineWidgetIsNew = false;
+    //   if (! lineWidget || lineWidget.length == 0) {
+    //     lineWidgetIsNew = true;
+    //     lineWidget = this.get('codeArea').addLineWidget(nodeLineCh.start.line, $('<span>')[0]);
+    //   } else {
+    //     lineWidget = lineWidget[0];
+    //   }
+    //   var widgetView;
+    //   if (! (widgetView = $(lineWidget.node).data('widgetView'))) {
+    //     widgetView = CodingSupport.FunctionCallView.create({
+    //       functionObject: options.functionObject
+    //     });
+    //     widgetView.appendTo(lineWidget);
+    //   }
+    //   console.log("widgetView", widgetView);
+    //   widgetView.get('scopes').pushObject(options.scope);
+    //   options.scope.addObserver('definedVariables.[]', lineWidget, 'changed');
+    //   this.get('callstack').pushObject({
+    //     callId: options.id,
+    //     scopes: widgetView.get('scopes'),
+    //     lineWidget: lineWidgetIsNew ? lineWidget : null
+    //   });
+    // },
+    // functionCallEndHandler: function(callId, err, val) {
+    //   return;
+    //
+    //   var obj = this.get('callstack').popObject();
+    //   if (obj.callId != callId) {
+    //     throw new Error("function call ids don't match! expected "+callId+" was "+obj.callId);
+    //   }
+    //   if (obj.lineWidget) {
+    //     obj.lineWidget.data('widgetView').get('scopes').forEach(function(scope) { scope.removeObserver('definedVariables.[]', obj.lineWidget, 'changed')});
+    //     obj.lineWidget.clear();
+    //   }
+    // },
+    nodeEvaluationHandler: function(frame, stack) {
+      var nodeType = frame.node.type;
+      if (nodeType == 'Program') { return; }
       var padding = "";
-      var interpreter = this.get('runController');
-      var nodeLineCh = interpreter.getNodeLineCh(node);
-      var oldText = this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end);
+      // var interpreter = this.get('runController');
+      var codeArea = this.get('codeArea');
+      var startPos = codeArea.posFromIndex(frame.node.start);
+      var endPos = codeArea.posFromIndex(frame.node.end);
+      // var nodeLineCh = interpreter.getNodeLineCh(node);
+      var oldText = this.get('codeArea').getRange(startPos, endPos);
 
       // var n = this.get('evalstack').length;
       // while (n--) {
@@ -444,33 +451,37 @@ window.CodingSupport = Em.Namespace.create({
       // }
       // console.log("evaluating", padding, oldText, "("+nodeType+")", nodeLineCh);
 
-      var mark = this.get('codeArea').markText(nodeLineCh.start, nodeLineCh.end, {className:'eval'+this.get('evalstack').length});
+      // console.log("evaluating node", frame.node, "at depth", stack.length);
+      var mark = this.get('codeArea').markText(startPos, endPos, {className:'eval'+stack.length});
 
-      this.get('evalstack').pushObject({
-        id: callId,
-        visible: (nodeType == 'call' || nodeType == 'whileStmnt'),
-        pos: nodeLineCh,
-        text: this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end)+"\n",
+      frame.node.__extra = {
+        // visible: (nodeType == 'call' || nodeType == 'whileStmnt'),
+        pos: {start: startPos, end: endPos},
+        // text: this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end)+"\n",
         mark: mark
-      });
+      };
     },
-    evaluationEndHandler: function(callId, node, scope, err, val) {
-      var nodeType = node.name;
-      if (nodeType == 'program') { return; }
-      var cs = this.get('evalstack');
-      if (cs[cs.length-1].id != callId) {
-        console.log("wtf?", callId, cs[cs.length-1].id);
-        return;
+    nodeEvaluationDoneHandler: function(frame, stack) {
+      var nodeType = frame.node.name;
+      if (nodeType == 'Program') { return; }
+
+      if (frame.node.__extra && frame.node.__extra.mark) {
+        frame.node.__extra.mark.clear();
       }
-      var padding = "";
-      var n = this.get('evalstack').length;
-      while (n--) {
-        padding += " ";
-      }
+      // var cs = this.get('evalstack');
+      // if (cs[cs.length-1].id != callId) {
+      //   console.log("wtf?", callId, cs[cs.length-1].id);
+      //   return;
+      // }
+      // var padding = "";
+      // var n = this.get('evalstack').length;
+      // while (n--) {
+      //   padding += " ";
+      // }
 
       // console.log("eval --> ", padding, val);
 
-      cs.popObject().mark.clear();
+      // cs.popObject().mark.clear();
       // var interpreter = this.get('runController');
       // var nodePosition = interpreter.getNodePosition(node);
       // var nodeLineCh = interpreter.convertPositionToLineCh(nodePosition);
@@ -492,10 +503,10 @@ window.CodingSupport = Em.Namespace.create({
       // // console.log("new text is", newText, val);
       // widgetNode.append(newText+"<br>");
     },
-    scopes: [],
-    createScopeHandler: function(scope) {
-      this.get('scopes').pushObject(scope);
-    },
+    // scopes: [],
+    // createScopeHandler: function(scope) {
+    //   this.get('scopes').pushObject(scope);
+    // },
     parse: function() {
       var code = this.getCode();
 

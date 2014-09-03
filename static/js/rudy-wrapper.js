@@ -1,4 +1,53 @@
 (function() {  
+  var JsRunner = Ember.Object.extend({
+    interpreter: null,
+    interpreterChange: function() {
+      this.get('interpreter').stateStack.addDelegate(this.get('eventDelegate'));
+    }.observes('interpreter'),
+    eventDelegate: Em.required(),
+    evaluationDelayBinding: "eventDelegate.evaluationDelay",
+    processing: Em.required(),
+    passEvent: function(name, arg1, arg2, etc) {
+      var eventHandler = this.get('eventDelegate');
+      if (eventHandler && eventHandler[name+"Handler"]) {
+        eventHandler[name+"Handler"].apply(eventHandler, Array.prototype.slice.call(arguments, 1));
+      }
+    },
+    stepAndSchedule: function() {
+      if (this.get('isFinished')) { return; }
+      try {
+        var result = this.get('interpreter').step();        
+        if (result && ! this.get('isWaiting')) {
+          Ember.run.later(this, 'stepAndSchedule', this.get('evaluationDelay'));
+        }
+        if (! result) {
+          this.set('isFinished', true);
+          this.get('completionCallback')();
+          this.passEvent("stop", this.get('interpreter'));
+        }
+      } catch (err) {
+        console.log(err);
+        this.get('processing').noLoop();
+        var interpreter = this.get('interpreter');
+        var topFrame = interpreter.stateStack[0];
+        this.passEvent("runtimeError", err, topFrame, interpreter.stateStack);
+        // {
+        //   line: 0, char: 0,
+        //   msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
+        // }, this.get('interpreter'));
+        this.passEvent("stop", this.get('interpreter'));
+      }
+    },
+    run: function(cb) {
+      this.set('completionCallback', cb);
+      this.stepAndSchedule();
+    },
+    stop: function() {
+      this.set('isFinished', true);
+      this.passEvent("stop", this.get('interpreter'));
+    }
+  });
+  
   function sketchProc(userCode, startLevel, eventHandler) {
     function passEvent(name, arg1, arg2, etc) {
       if (eventHandler && eventHandler[name+"Handler"]) {
@@ -9,46 +58,89 @@
       with (processing) {
         function runUserCode(cb) {
           if (userCode == "") { return cb(); }
-          var interpreter = window.JSEvaluator.Interpreter.create({
-            builtIns: {
-              right: {type: "async-function", underlying: right},
-              down: {type: "async-function", underlying: down},
-              up: {type: "async-function", underlying: up},
-              left: {type: "async-function", underlying: left},
-              coloring: {type: "sync-function", underlying: coloring},
-              remainingDots: {type: "sync-function", underlying: remainingDots}
-            },
+          
+          var runner = JsRunner.create({
             eventDelegate: eventHandler,
-            evaluationDelayBinding: "eventDelegate.evaluationDelay"
+            processing: processing
           });
-          passEvent("start", interpreter);
-          interpreter.interpret(userCode, null, null, function(err, val) {
-            if (err) {
-              if (err.errorType == "timeout") {
-                processing.noLoop();
-                passEvent("runtimeError", {
-                  line: err.startPos.line+1, char: err.startPos.col,
-                  msg: "Execution timed out."
-                });
-              } else if (err.errorType == "stopped") {
-                processing.noLoop();
-                // passEvent("runtimeError", {
-                //   line: err.startPos.line+1, char: err.startPos.col,
-                //   msg: "Interpreter stopped."
-                // });
-              } else {
-                console.log(err);
-                processing.noLoop();
-                passEvent("runtimeError", {
-                  line: 0, char: 0,
-                  msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
-                });
-              }                
-            } else {
-              cb();
+          
+          function postScopeInit(interpreter, scope) {
+            function processArgs(args) {
+              return args.map(function(arg) {
+                if (arg.isPrimitive) {
+                  return arg.data;
+                } else {
+                  throw 'Unknown arg type: '+JSON.stringify(arg);
+                }
+              });
             }
-            passEvent("stop");
-          });
+            function wrapNativeFunction(f) {
+              return function(var_arg) {
+                return interpreter.createPrimitive(f.apply(null, processArgs(Array.prototype.slice.call(arguments))));                
+              }
+            }
+            function wrapAsyncFunction(f) {
+              return function(var_arg) {
+                runner.set('isWaiting', true);
+                var realArgs = processArgs(Array.prototype.slice.call(arguments));
+                realArgs.unshift(function(value) {
+                  interpreter.stateStack[0].value = value;
+                  runner.set('isWaiting', false);
+                  runner.stepAndSchedule();
+                });
+                f.apply(null, realArgs);
+                return interpreter.createPrimitive(undefined);                
+              }
+            }
+            var asyncs = {right: right, down: down, up: up, left: left};
+            var syncs = {coloring: coloring, remainingDots: remainingDots, log: function(arg1, arg2, etc) {
+              console.log.apply(console, Array.prototype.slice.call(arguments));
+            }};
+            Object.keys(asyncs).forEach(function(key) {
+              if (this.hasOwnProperty(key)) {
+                interpreter.setProperty(scope, key, 
+                  interpreter.createNativeFunction(wrapAsyncFunction(this[key])));
+              }
+            }, asyncs);
+            Object.keys(syncs).forEach(function(key) {
+              if (this.hasOwnProperty(key)) {
+                interpreter.setProperty(scope, key,
+                  interpreter.createNativeFunction(wrapNativeFunction(this[key])));
+              }
+            }, syncs);
+          }
+          
+          runner.set('interpreter', new Interpreter(userCode, postScopeInit));
+          runner.passEvent('start', runner);
+          runner.run(cb);
+          // passEvent("start", interpreter);
+          // interpreter.interpret(userCode, null, null, function(err, val) {
+          //   if (err) {
+          //     if (err.errorType == "timeout") {
+          //       processing.noLoop();
+          //       passEvent("runtimeError", {
+          //         line: err.startPos.line+1, char: err.startPos.col,
+          //         msg: "Execution timed out."
+          //       });
+          //     } else if (err.errorType == "stopped") {
+          //       processing.noLoop();
+          //       // passEvent("runtimeError", {
+          //       //   line: err.startPos.line+1, char: err.startPos.col,
+          //       //   msg: "Interpreter stopped."
+          //       // });
+          //     } else {
+          //       console.log(err);
+          //       processing.noLoop();
+          //       passEvent("runtimeError", {
+          //         line: 0, char: 0,
+          //         msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
+          //       });
+          //     }
+          //   } else {
+          //     cb();
+          //   }
+          //   passEvent("stop");
+          // });
         }
 
         // ROBOT CODE
@@ -83,7 +175,9 @@
         var coloring = function() {
           if (! level.colors) { return false; }
           var c = level.colors.contains(position.x, position.y);
-          return c ? c.hue : false;
+          var returnValue = c ? c.hue : false;
+          // console.log("coloring(", position.x, ",", position.y, ") = ", returnValue);
+          return returnValue;
         }
         var remainingDots = function() {
           return level ? level.dots.list.length - level.dots.count("found", true) : 0;
