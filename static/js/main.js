@@ -35,7 +35,8 @@ window.CodingSupport = Em.Namespace.create({
             predef.right = false;
             predef.up = false;
             predef.down = false;
-            predef.coloring = false;
+            predef.getColor = false;
+            predef.setColor = false;
             predef.remainingDots = false;
             predef.log = false;
             break;
@@ -56,6 +57,7 @@ window.CodingSupport = Em.Namespace.create({
         sloppy: true,
         vars: true,
         white: true,
+        indent: 2,
         regexp: true,
         forin: true,
         sub: true,
@@ -298,7 +300,7 @@ window.CodingSupport = Em.Namespace.create({
   CodeController: Em.Object.extend({
     validate: function(code, suppressBoxes) {
       this.get('codeMirrorView').clearErrors();
-      var errors = this.get('syntaxChecker').check(code);
+      var errors = this.get('syntaxChecker').check(code.replace(/\t/g, "  "));
       if (errors) {
         $.ajax('/noteError', {
           type: 'post',

@@ -25,6 +25,11 @@ body {
   font-weight: bold;
 }
 
+table td p {
+  font-size: 13px;
+  line-height: 18px;
+}
+
 .callout {
   position: absolute;
   margin-top: 20px;

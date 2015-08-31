@@ -42,7 +42,7 @@
         this.set('completed', true);
       },
 
-      evaluationDelay: <%= extra && 'evaluationDelay' in extra ? extra.evaluationDelay : 256 %>,
+      evaluationDelay: <%= extra && 'evaluationDelay' in extra ? extra.evaluationDelay : 32 %>,
       evaluationDelayWatch: function() {
         this.noteCodeChange();
       }.observes('evaluationDelay'),
@@ -169,7 +169,7 @@
 
     <h4>If, else</h4>
     <p>Run some code if a condition is true:
-      <pre style="color: #d14">if (coloring() == 'blue') {
+      <pre style="color: #d14">if (coloring() == "blue") {
   right();
 } else {
   left();
@@ -178,24 +178,38 @@ This code tells Rudy to go right if the current color is blue, and left otherwis
 
     <h4>While</h4>
     <p>Repeat some code as long as a condition is true:
-      <pre style="color: #d14;">while (coloring() == 'blue') {
+      <pre style="color: #d14;">while (coloring() == "blue") {
   down();
 }</pre>
 This code tells Rudy to go down as long as the square Rudy is currently on is blue.</p>
+    <p>Other possible condition checks include:</p>
+    <table>
+      <tr><td><code>!=</code></td><td><p>(not equal to)</p></td></tr>
+      <tr><td><code>&lt; </code></td><td><p>(less than)</p></td></tr>
+      <tr><td><code>&lt;=</code></td><td><p>(less than or equal to)</p></td></tr>
+      <tr><td><code>&gt; </code></td><td><p>(greater than)</p></td></tr>
+      <tr><td><code>&gt;=</code></td><td><p>(greater than or equal to)</p></td></tr>
+    </table>
+    <p>Combine conditions with logical <code>||</code> (or) and <code>&&</code> (and), like:
+      <pre style="color: #d14;">if ((coloring() == "red") || (total &lt; 8)) { 
+  right(); 
+}</pre>
+    </p>
 
     <h4>Functions</h4>
-    <p>To execute the <em>repeat</em> function:
-      <pre style="color: #d14;">repeat(5, down);</pre>
-      This function <em>repeat</em> is executed with two parameters: the number <em>5</em> and the function <em>down</em>.
+    <p>To execute the <em>repeatDown</em> function:
+      <pre style="color: #d14;">repeatDown(5);</pre>
+      This function <em>repeatDown</em> is executed with one parameter: the number <em>5</em>.
     </p>
-    <p>To define the <em>repeat</em> function:
-      <pre style="color: #d14;">function repeat(n, direction) {
-  while (n > 0) {
-    direction();
-    n = n - 1;
+    <p>To define the <em>repeatDown</em> function:
+      <pre style="color: #d14;">function repeatDown(total) {
+  var count = 0;
+  while (count < total) {
+    down();
+    count = count + 1;
   }
 }</pre>
-The previous example, <code>repeat(5, down)</code>, sets <code>n = 5</code> and <code>direction = down</code> inside the body of the <em>repeat</em> function.
+The previous example, <code>repeatDown(5)</code>, sets <code>total = 5</code> inside the body of the <em>repeatDown</em> function.
     </p>
   </div>
   <div style="margin-right: 370px;">
