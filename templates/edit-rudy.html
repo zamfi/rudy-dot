@@ -169,7 +169,7 @@
 
     <h4>If, else</h4>
     <p>Run some code if a condition is true:
-      <pre style="color: #d14">if (coloring() == "blue") {
+      <pre style="color: #d14">if (getColor() == "blue") {
   right();
 } else {
   left();
@@ -178,7 +178,7 @@ This code tells Rudy to go right if the current color is blue, and left otherwis
 
     <h4>While</h4>
     <p>Repeat some code as long as a condition is true:
-      <pre style="color: #d14;">while (coloring() == "blue") {
+      <pre style="color: #d14;">while (getColor() == "blue") {
   down();
 }</pre>
 This code tells Rudy to go down as long as the square Rudy is currently on is blue.</p>
@@ -191,7 +191,7 @@ This code tells Rudy to go down as long as the square Rudy is currently on is bl
       <tr><td><code>&gt;=</code></td><td><p>(greater than or equal to)</p></td></tr>
     </table>
     <p>Combine conditions with logical <code>||</code> (or) and <code>&&</code> (and), like:
-      <pre style="color: #d14;">if ((coloring() == "red") || (total &lt; 8)) { 
+      <pre style="color: #d14;">if ((getColor() == "red") || (total &lt; 8)) { 
   right(); 
 }</pre>
     </p>

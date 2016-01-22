@@ -31,10 +31,6 @@
         var interpreter = this.get('interpreter');
         var topFrame = interpreter.stateStack[0];
         this.passEvent("runtimeError", err, topFrame, interpreter.stateStack);
-        // {
-        //   line: 0, char: 0,
-        //   msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
-        // }, this.get('interpreter'));
         this.passEvent("stop", this.get('interpreter'));
       }
     },
@@ -47,6 +43,7 @@
       this.passEvent("stop", this.get('interpreter'));
     }
   });
+  
   
   function sketchProc(userCode, startLevel, eventHandler) {
     function passEvent(name, arg1, arg2, etc) {
@@ -113,34 +110,6 @@
           runner.set('interpreter', new Interpreter(userCode, postScopeInit));
           runner.passEvent('start', runner);
           runner.run(cb);
-          // passEvent("start", interpreter);
-          // interpreter.interpret(userCode, null, null, function(err, val) {
-          //   if (err) {
-          //     if (err.errorType == "timeout") {
-          //       processing.noLoop();
-          //       passEvent("runtimeError", {
-          //         line: err.startPos.line+1, char: err.startPos.col,
-          //         msg: "Execution timed out."
-          //       });
-          //     } else if (err.errorType == "stopped") {
-          //       processing.noLoop();
-          //       // passEvent("runtimeError", {
-          //       //   line: err.startPos.line+1, char: err.startPos.col,
-          //       //   msg: "Interpreter stopped."
-          //       // });
-          //     } else {
-          //       console.log(err);
-          //       processing.noLoop();
-          //       passEvent("runtimeError", {
-          //         line: 0, char: 0,
-          //         msg: "Runtime error: "+(err && err.getMessage ? err.getMessage() : "(unknown)")
-          //       });
-          //     }
-          //   } else {
-          //     cb();
-          //   }
-          //   passEvent("stop");
-          // });
         }
 
         // ROBOT CODE
@@ -678,20 +647,22 @@
                   fill(154);
                   if ((level.colors.contains(border.from.x, border.from.y) || {}).hue !=
                       (level.colors.contains(border.to.x, border.to.y) || {}).hue) {
+                    // gate is closed!
                     if (border.to.x > border.from.x) {
-                      // vertical gate!
+                      // vertical gate
                       rect(MARGIN+border.to.x*GRIDWIDTH-GRIDWIDTH/20,
                            MARGIN+border.to.y*GRIDWIDTH,
                            GRIDWIDTH/10, GRIDWIDTH);
                     } else {
-                      // horizontal gate!
+                      // horizontal gate
                       rect(MARGIN+border.to.x*GRIDWIDTH,
                            MARGIN+border.yo.y*GRIDWIDTH-GRIDWIDTH/20,
                            GRIDWIDTH, GRIDWIDTH/10);
                     }
                   } else {
+                    // gate is open!
                     if (border.to.x > border.from.x) {
-                      // vertical gate!
+                      // vertical gate
                       rect(MARGIN+border.to.x*GRIDWIDTH-GRIDWIDTH/20,
                            MARGIN+border.to.y*GRIDWIDTH,
                            GRIDWIDTH/10, GRIDWIDTH/6);
@@ -699,7 +670,7 @@
                            MARGIN+border.to.y*GRIDWIDTH+5*GRIDWIDTH/6,
                            GRIDWIDTH/10, GRIDWIDTH/6);
                     } else {
-                      // horizontal gate!
+                      // horizontal gate
                       rect(MARGIN+border.to.x*GRIDWIDTH,
                            MARGIN+bor6der.yo.y*GRIDWIDTH-GRIDWIDTH/20,
                            GRIDWIDTH/6, GRIDWIDTH/10);
