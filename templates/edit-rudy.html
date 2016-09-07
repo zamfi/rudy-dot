@@ -156,6 +156,7 @@
   </div>
   <div id="pjs-wrapper" class="pull-right" style="width: 360px; padding-left: 10px; overflow: scroll;">
     <canvas id="pjs"></canvas>
+    <canvas id="sample" style="display: none;"></canvas>
     {{view Main.NotifyOnLoadView targetBinding="Main.controller" action="resizeSidebar"}}
     <h3>Programming Syntax Cheat Sheet</h3>
     <h4>Naming &amp; updating</h4>
@@ -213,7 +214,7 @@ The previous example, <code>repeatDown(5)</code>, sets <code>total = 5</code> in
     </p>
   </div>
   <div style="margin-right: 370px;">
-    {{#view CodingSupport.CodeMirrorView autoResize=true controllerBinding="Main.controller"}}<%- initialCode %>{{/view}}
+    {{#view CodingSupport.CodeMirrorView autoResize=true controllerBinding="Main.controller" initialCode="<%- encodeURIComponent(initialCode) %>"}}{{/view}}
   </div>
 </script>
 

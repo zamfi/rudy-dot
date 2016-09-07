@@ -2,11 +2,14 @@
   var JsRunner = Ember.Object.extend({
     interpreter: null,
     interpreterChange: function() {
-      this.get('interpreter').stateStack.addDelegate(this.get('eventDelegate'));
+      if (this.get('eventDelegate')) {
+        this.get('interpreter').stateStack.addDelegate(this.get('eventDelegate'));        
+      }
     }.observes('interpreter'),
     eventDelegate: Em.required(),
     evaluationDelayBinding: "eventDelegate.evaluationDelay",
     processing: Em.required(),
+    deadline: 0,
     passEvent: function(name, arg1, arg2, etc) {
       var eventHandler = this.get('eventDelegate');
       if (eventHandler && eventHandler[name+"Handler"]) {
@@ -15,6 +18,15 @@
     },
     stepAndSchedule: function() {
       if (this.get('isFinished')) { return; }
+      if (this.get('deadline') && this.get('deadline') < Date.now()) {
+        console.log("Execuntion timeout!");
+        this.get('processing').noLoop();
+        var interpreter = this.get('interpreter');
+        var topFrame = interpreter.stateStack[0];        
+        this.passEvent("runtimeError", new Error("timeout"), interpreter.stateStack[0], interpreter.stateStack);
+        this.passEvent("stop", this.get('interpreter'));
+        return;
+      }
       try {
         var result = this.get('interpreter').step();        
         if (result && ! this.get('isWaiting')) {
@@ -45,20 +57,24 @@
   });
   
   
-  function sketchProc(userCode, startLevel, eventHandler) {
+  function sketchProc(userCode, startLevel, eventHandler, seed, completionCallback) {
     function passEvent(name, arg1, arg2, etc) {
       if (eventHandler && eventHandler[name+"Handler"]) {
         eventHandler[name+"Handler"].apply(eventHandler, Array.prototype.slice.call(arguments, 1));
       }
     }
+    var DONTDRAW = (completionCallback !== undefined);
     return function(processing) {
+      console.log("DONTDRAW?", DONTDRAW);
       with (processing) {
         function runUserCode(cb) {
           if (userCode == "") { return cb(); }
           
-          var runner = JsRunner.create({
-            eventDelegate: eventHandler,
-            processing: processing
+          runner = JsRunner.create({
+            eventDelegate: (DONTDRAW ? null : eventHandler),
+            evaluationDelay: (DONTDRAW ? 0 : undefined),
+            processing: processing,
+            deadline: DONTDRAW ? Date.now() + 500 : 0
           });
           
           function postScopeInit(interpreter, scope) {
@@ -114,10 +130,19 @@
 
         // ROBOT CODE
         setup = function() {
+          if (seed) {
+            randomSeed(seed);
+          }
           size(340, 340);
-          background(255);
+          if (! DONTDRAW) {
+            background(255);            
+          }
           setLevel(startLevel);
-          runUserCode(function() {});
+          runUserCode(function() {
+            if (completionCallback && DONTDRAW)  {
+              completionCallback(remainingDots() == 0);
+            }
+          });
         }
   
         var position = null;
@@ -149,7 +174,8 @@
           "red": {r: 255, g: 220, b: 220},
           "blue": {r: 150, g: 200, b: 255},
           "green": {r: 200, g: 255, b: 200},
-          "yellow": {r: 255, g: 255, b: 200}          
+          "yellow": {r: 255, g: 255, b: 200},
+          false: {r: 255, g: 255, b: 255}
         }
  
         var getColor = function() {
@@ -181,22 +207,22 @@
           return level ? level.dots.list.length - level.dots.count("found", true) : 0;
         }
         
-        function levelRoundTheFence() {
+        var levelRoundTheFence = function() {
           return { 
             dots: new PositionSet([ {x: 5, y: 5}, {x: 7, y: 5} ]),
             obstacles: makeRectangularPositionSet(2, 0, 1, 7) 
           };
         }
         
-        function levelAnObstacleCourse() {
+        var levelAnObstacleCourse = function() {
           return {
             dots: new PositionSet([ {x: 5, y: 5}, {x: 5, y: 7}]),
             obstacles: makeRectangularPositionSet(2, 0, 1, 6).concat(makeRectangularPositionSet(4, 5, 1, 5))
           };
         }
         
-        function levelThroughTheGate() {
-          var hue = ['red', 'blue', 'green', 'yellow'][Math.floor(Math.random()*4)];
+        var levelThroughTheGate = function() {
+          var hue = ['red', 'blue', 'green', 'yellow'][Math.floor(random()*4)];
           return {
             dots: new PositionSet([ {x: 4, y: 4 } ]),
             obstacles: makeRectangularPositionSet(3,0,1,5).concat(makeRectangularPositionSet(3,6,1,4)),
@@ -205,8 +231,8 @@
           };
         }
         
-        function levelThroughTwoGates() {
-          var randomIndex = Math.floor(Math.random()*4);
+        var levelThroughTwoGates = function() {
+          var randomIndex = Math.floor(random()*4);
           var hue1 = ['red', 'blue', 'green', 'yellow'][randomIndex];
           var hue2 = ['blue', 'green', 'yellow', 'red'][randomIndex];
           return {
@@ -218,10 +244,10 @@
           };
         }
 
-        function levelGateSequence() {
+        var levelGateSequence = function() {
           var hues = [];
           for (var i = 0; i < 8; ++i) {
-            hues.push(['red', 'blue', 'green', 'yellow'][Math.floor(Math.random()*4)]);
+            hues.push(['red', 'blue', 'green', 'yellow'][Math.floor(random()*4)]);
           }
           var obstacles = makeRectangularPositionSet(1,0,1,9);
           for (var i = 0; i < 7; ++i) {
@@ -248,17 +274,17 @@
           }
         }
         
-        function levelDownUpDownUpDown() {
+        var levelDownUpDownUpDown = function() {
           return {
             dots: new PositionSet([ {x: 9, y: 8 } ]),
             obstacles: makeRectangularPositionSet(1,0,1,8).concat(makeRectangularPositionSet(3,2,1,8)).concat(makeRectangularPositionSet(5,0,1,8)).concat(makeRectangularPositionSet(7,2,1,8)).concat(makeRectangularPositionSet(9,0,1,8)) 
           };
         }
  
-        function levelUpOrDown() {
+        var levelUpOrDown = function() {
           var holes = [5];
           for (var i = 1; i <= 3; ++i) {
-              holes.push(holes[i-1]+(Math.random()<0.5 ? -1 : 1));
+              holes.push(holes[i-1]+(random()<0.5 ? -1 : 1));
           }
           var start = 1;
           var obstacles = new PositionSet([]);
@@ -280,8 +306,8 @@
           return ret;    
         }
         
-        function levelOutOfTheBox() {
-          var path = [Math.random() < 0.5, Math.random() < 0.5];
+        var levelOutOfTheBox = function() {
+          var path = [random() < 0.5, random() < 0.5];
           return {
             start: {x: 3, y: 4},
             dots: new PositionSet([ {x: path[1] ? 3 : 5, y: path[0] ? 0 : 8 }]),
@@ -293,12 +319,12 @@
           }
         }
  
-        function levelRedsTheMark() {
+        var levelRedsTheMark = function() {
           var holes = [
-              Math.floor(Math.random()*5+5),
-              Math.floor(Math.random()*5),
-              Math.floor(Math.random()*5+5),
-              Math.floor(Math.random()*5) 
+              Math.floor(random()*5+5),
+              Math.floor(random()*5),
+              Math.floor(random()*5+5),
+              Math.floor(random()*5) 
           ];
           var start = 1;
           var obstacles = new PositionSet([]);
@@ -318,7 +344,7 @@
           return ret;
         }
     
-        function levelFollowTheColors() {
+        var levelFollowTheColors = function() {
           function sum(p1, p2) {
             return {x: p1.x + p2.x, y: p1.y + p2.y};
           }
@@ -331,7 +357,7 @@
           var lastNextPos = {x: 9, y: 9};
           var lastDirection;
           while (attempts-- > 0) {
-            var dIndex = Math.floor(Math.random()*4);
+            var dIndex = Math.floor(random()*4);
             var direction = [{x: -1, y: 0}, {x: 0, y: -1}, {x: 1, y: 0}, {x: 0, y: 1}][dIndex];
             if (dIndex == lastDirection) {
               continue;
@@ -345,7 +371,7 @@
             }
             passedOver.push(nextPos);
             lastNextPos = nextPos;
-            for (var i = 0; i < Math.floor(Math.random()*9); ++i) {
+            for (var i = 0; i < Math.floor(random()*9); ++i) {
               nextPos = sum(nextPos, direction);
               if (nextPos.x < 0 || nextPos.x > 9 || nextPos.y < 0 || nextPos.y > 9) {
                 break;
@@ -353,7 +379,7 @@
               if (passedOver.contains(nextPos.x, nextPos.y)) {
                 break;
               }
-              if (Math.random() < 0.25) {
+              if (random() < 0.25) {
                 // obstacles.push(nextPos);
                 // passedOver.push(nextPos);
                 break;
@@ -368,7 +394,7 @@
           }
           for (var i = 0; i < 10; ++i) {
             for (var j = 0; j < 10; ++j) {
-              if (Math.random() < .75 && 
+              if (random() < .75 && 
                   ! passedOver.contains(i, j) && (
                   passedOver.contains(i-1, j) ||
                   passedOver.contains(i, j-1) ||
@@ -404,7 +430,11 @@
                   dot.found = true;
                 }
                 if (remainingDots() == 0) {
-                  if (levelNum < levels.length) {
+                  if (completionCallback) {
+                    completionCallback(true);
+                    completionCallback = null;
+                  }
+                  if ((! DONTDRAW) && levelNum < levels.length) {
                     passEvent("levelCompleted", levelNum+1);                  
                   }
                   overlayText = "LEVEL "+(levelNum+1)+"\nCLEARED";
@@ -414,8 +444,15 @@
               moveFinishedCb = null;
               cb();
             }
+            if (DONTDRAW) {
+              moveFinishedCb();
+            }
           } else {
-            setTimeout(cb, MOVETIME);
+            if (DONTDRAW) {
+              cb();
+            } else {
+              setTimeout(cb, MOVETIME);              
+            }
           }
         }
         var left = function(cb) {
@@ -720,20 +757,67 @@
  
         draw = function() {
             // if (runningUserCode) { return; }
-            updatePosition();
-            simRedraw();
+            if (! DONTDRAW) {
+              updatePosition();
+              simRedraw();              
+            }
         }
       }
     };
   }
   var processingInstance;
-  function executeCode(userCode, controller) {
-    if (processingInstance) {
-      processingInstance.noLoop();
+  var sampleInstance;
+  var lastSeed;
+  var doneRunningSamples = false;
+  function sampleExecution(userCode, controller, cb) {
+    if (sampleInstance) {
+      sampleInstance.noLoop();
       // console.log(processingInstance);
     }
+    var canvas = document.getElementById('sample');
+
+    lastSeed = Date.now() + Math.floor(Math.random() * 10000000000);
+    console.log("running sample with seed", lastSeed);
+    var start = Date.now();
+    sampleInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, lastSeed, function(success) {
+      if (! success) {
+        cb();
+      } else {
+        setTimeout(function() {
+          if (! doneRunningSamples) {
+            sampleExecution(userCode, controller, cb);
+          }
+        }, 0);
+      }
+    }));
+  }
+  
+  function executeCode(userCode, controller) {
     var canvas = document.getElementById('pjs');
-    processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller));
+    var expiredTimeout;
+    function doRealExecution(seed) {
+      doneRunningSamples = true;
+      if (expiredTimeout) {
+        clearTimeout(expiredTimeout);
+        expiredTimeout = null;
+      }
+      if (processingInstance) {
+        processingInstance.noLoop();
+        // console.log(processingInstance);
+      }
+      if (sampleInstance) {
+        sampleInstance.noLoop();
+      }
+      processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, seed, undefined));      
+    }
+    expiredTimeout = setTimeout(function() { 
+      expiredTimeout = null;
+      doRealExecution(lastSeed);
+    }, 500);
+    doneRunningSamples = false;
+    sampleExecution(userCode, controller, function() {
+      doRealExecution(lastSeed);
+    });
   }
 
   window.ProcessingWrapper = {

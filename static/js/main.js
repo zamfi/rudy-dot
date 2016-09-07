@@ -130,7 +130,7 @@ window.CodingSupport = Em.Namespace.create({
     status: 'off',
     didInsertElement: function() {
       this._super();
-      var initialCode = this.$().text();
+      var initialCode = this.get('initialCode') ? decodeURIComponent(this.get('initialCode')) : this.$().text();
       this.$().html('<textarea>'+initialCode+'</textarea>');
 
       var self = this;
