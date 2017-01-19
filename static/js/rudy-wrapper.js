@@ -19,7 +19,7 @@
     stepAndSchedule: function() {
       if (this.get('isFinished')) { return; }
       if (this.get('deadline') && this.get('deadline') < Date.now()) {
-        console.log("Execuntion timeout!");
+        console.log("Execution timeout!");
         this.get('processing').noLoop();
         var interpreter = this.get('interpreter');
         var topFrame = interpreter.stateStack[0];        
@@ -57,7 +57,7 @@
   });
   
   
-  function sketchProc(userCode, startLevel, eventHandler, seed, completionCallback) {
+  function sketchProc(userCode, startLevel, eventHandler, seed, deadline, completionCallback) {
     function passEvent(name, arg1, arg2, etc) {
       if (eventHandler && eventHandler[name+"Handler"]) {
         eventHandler[name+"Handler"].apply(eventHandler, Array.prototype.slice.call(arguments, 1));
@@ -71,10 +71,11 @@
           if (userCode == "") { return cb(); }
           
           runner = JsRunner.create({
+            id: Math.floor(Math.random() * 1000000000),
             eventDelegate: (DONTDRAW ? null : eventHandler),
             evaluationDelay: (DONTDRAW ? 0 : undefined),
             processing: processing,
-            deadline: DONTDRAW ? Date.now() + 500 : 0
+            deadline: DONTDRAW ? deadline : 0
           });
           
           function postScopeInit(interpreter, scope) {
@@ -769,6 +770,7 @@
   var sampleInstance;
   var lastSeed;
   var doneRunningSamples = false;
+  var samplesDeadline = Date.now() + 500;
   function sampleExecution(userCode, controller, cb) {
     if (sampleInstance) {
       sampleInstance.noLoop();
@@ -779,7 +781,7 @@
     lastSeed = Date.now() + Math.floor(Math.random() * 10000000000);
     console.log("running sample with seed", lastSeed);
     var start = Date.now();
-    sampleInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, lastSeed, function(success) {
+    sampleInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, lastSeed, samplesDeadline, function(success) {
       if (! success) {
         cb();
       } else {
@@ -796,6 +798,7 @@
     var canvas = document.getElementById('pjs');
     var expiredTimeout;
     function doRealExecution(seed) {
+      console.log("DONE RUNNING SAMPLES");
       doneRunningSamples = true;
       if (expiredTimeout) {
         clearTimeout(expiredTimeout);
@@ -808,7 +811,7 @@
       if (sampleInstance) {
         sampleInstance.noLoop();
       }
-      processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, seed, undefined));      
+      processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, seed, undefined, undefined));      
     }
     expiredTimeout = setTimeout(function() { 
       expiredTimeout = null;

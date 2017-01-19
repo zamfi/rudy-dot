@@ -197,7 +197,9 @@ window.CodingSupport = Em.Namespace.create({
       var codeArea = this.get('codeArea')
       codeArea.clearGutter('gutter-warning');
       this.get('markedLines').forEach(function(lineHandle) {
-        codeArea.removeLineClass(lineHandle, 'wrap');
+        if (lineHandle) {
+          codeArea.removeLineClass(lineHandle, 'wrap');          
+        }
         // codeArea.clearMarker(lineHandle);
       });
       this.set('markedLines', []);
