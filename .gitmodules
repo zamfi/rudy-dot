@@ -1,3 +1,6 @@
 [submodule "static/js/JS-Interpreter"]
 	path = static/js/JS-Interpreter
 	url = git@github.com:zamfi/JS-Interpreter.git
+[submodule "rudy/src/JS-Interpreter"]
+	path = rudy/src/JS-Interpreter
+	url = git@github.com:zamfi/JS-Interpreter.git

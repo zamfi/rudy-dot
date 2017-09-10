@@ -1,0 +1,213 @@
+#root {
+	height: 100%;
+}
+
+.app {
+	position: absolute;
+	display: flex;
+	flex-direction: column;
+	top: 10px;
+	bottom: 10px;
+	left: 10px;
+	right: 10px;
+}
+
+.toolbar {
+/*	height: 50px;*/
+	margin-bottom: 10px;
+}
+
+.toolbar-entry {
+	display: inline-block;
+	margin: 0 20px 0 0;
+	font-size: 14px;
+}
+
+.toolbar-entry:last-child {
+	margin: 0;
+}
+
+.toolbar-entry input {
+	position: relative;
+	top: 4px;
+}
+
+.cm-container {
+	border: 1px solid #ccc;
+	flex-grow: 1;
+	display: flex;
+	position: relative;
+}
+
+.CodeMirror {
+	position: absolute;
+	top: 0; bottom: 0;
+}
+
+body {
+	height: 100%;
+  color: #333;
+}
+
+html {
+	height: 100%;
+}
+
+.editor-panel {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	top: 0px;
+	bottom: 0px;
+	right: 0px;
+	left: 0px;
+}
+
+
+#rudy-canvas-parent {
+	display: block;
+	width: 360px;
+	height: 360px;
+}
+
+#rudy-sidebar {
+	display: flex;
+	flex-direction: column;
+	width: 360px;
+	position: relative;
+	top: 0px;
+	bottom: 0px;
+	overflow-y: scroll;
+}
+
+.rudy-syntax-helper {
+	width: 340px;
+	padding: 0 10px;
+	position: relative;
+	top: 0px;
+	bottom: 0px;
+}
+
+.button {
+	border-radius: 5px;
+	border: 0;
+	padding: 7px 10px;
+	color: white;
+	font-weight: 400;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.run.button {
+	background: #0080FF;
+}
+.advance.button {
+  background: #008000;
+}
+
+.label {
+  color: white;
+  font-weight: bold;
+  display: inline-block;
+  border: 0;
+  border-radius: 3px;
+  padding: 3px 4px 2px;
+  font-size: 80%;
+}
+
+.advance.label {
+  background: #008000;
+}
+
+.save.label {
+  text-transform: uppercase;
+}
+
+.save.label.saved {
+  background: #008000;
+}
+
+.save.label.saving {
+  background: #00F;
+}
+
+.save.label.error {
+  background: #F00;
+}
+
+.link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rudy-syntax-helper code {
+  font-family: monospace;
+  background: #eee;
+  border: 1px solid #ccc;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+table p {
+  margin: 0;
+}
+
+.rudy-syntax-helper table {
+  padding: 0;
+  margin: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.rudy-syntax-helper td {
+  padding-left: 5px;
+  padding-bottom: 5px;
+}
+
+.rudy-syntax-helper td p {
+  padding-left: 10px;
+}
+.rudy-syntax-helper td:first-child {
+  text-align: right;
+}
+
+/* for evaluation */
+.eval0 {
+  background: rgb(255, 240, 240);
+}
+.eval1 {
+  background: rgb(255, 220, 220);
+}
+.eval2 {
+  background: rgb(255, 200, 200);
+}
+.eval3 {
+  background: rgb(255, 180, 180);
+}
+.eval4 {
+  background: rgb(255, 160, 160);
+}
+.eval5 {
+  background: rgb(255, 140, 140);
+}
+.eval6 {
+  background: rgb(255, 120, 120);
+}
+.eval7 {
+  background: rgb(255, 100, 100);
+}
+.eval8 {
+  background: rgb(255, 80, 80);
+}
+.eval9 {
+  background: rgb(255, 60, 60);
+}
+.eval10 {
+  background: rgb(255, 40, 40);
+}
+.eval11 {
+  background: rgb(255, 20, 20);
+}
+.eval12 {
+  background: rgb(255, 0, 0);
+}
