@@ -25,12 +25,13 @@ class RudyRunner {
     if (this.editor) {
       this.editor.freezeErrors();
       let pos = this.editor.getNodePosition(frame.node);
+      // console.log(frame.node);
       this.editor.createError("error", pos.line-1, pos.ch, `Runtime error: ${err.getMessage ? err.getMessage() : String(err)}`, true)
     }
   }
   
   async prerunSamples() {
-    let deadline = Date.now() + 1500; // 1.5 seconds from now...
+    let deadline = Date.now() + 750; // 3/4 of a second from now...
     var lastSeed;
     try {
       while (Date.now() < deadline) {
@@ -49,17 +50,13 @@ class RudyRunner {
   
   sampleExecution(deadline) {
     return new Promise((resolve, reject) => {
-      let startTime = Date.now();
       let seed = Date.now() + Math.floor(Math.random() * 10000000000);
       this.runner = new SessionRunner(this.code, this.level, 0, seed, null, null);
-      let runMakeTime = Date.now();
       this.runner.deadline = deadline;
       this.runner.run((success) => {
-        console.log("Sample time", runMakeTime-startTime, Date.now() - runMakeTime);
         if (success) {
           resolve(seed);
         } else {
-          console.log("Seed failed:", seed);
           reject(seed);
         }
       });
@@ -71,17 +68,22 @@ class RudyRunner {
     if (! skipSampling) {
       seed = await this.prerunSamples()
       if (seed instanceof Error) {
-        console.log("Got an error from run...");
         doneCb();
         return;
       }
     }
-    console.log("using seed", seed);
     while(this.parentElement.lastChild) {
       this.parentElement.removeChild(this.parentElement.lastChild);
     }
     this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.parentElement);
     this.runner.run(doneCb);
+
+    // XXX This is caused by a bug that only shows up in Safari where the canvas isn't made visible...
+    if (this.parentElement.firstChild.dataset.hidden === 'true') {
+      console.log("Showing because was still hidden #racecondition");
+      this.parentElement.firstChild.style.visibility = '';
+      delete this.parentElement.firstChild.dataset.hidden
+    }
   }
   
   stop() {
@@ -107,6 +109,7 @@ class RudyRunner {
 
 class SessionRunner {
   constructor(code, level, evaluationDelay, randomSeed, eventHandler, drawIntoElement) {
+    // console.log("session running drawing into", drawIntoElement);
     this.randomSeed = randomSeed;
     this.parentElement = drawIntoElement;
     this.evaluationDelay = evaluationDelay;
@@ -120,7 +123,7 @@ class SessionRunner {
       "yellow": {r: 255, g: 255, b: 200},
       false: {r: 255, g: 255, b: 255}
     };
-    this.p5 = new p5((sketch) => this.p5init(sketch), drawIntoElement || document.createElement('div')); // use existing element, or fake one.
+    this.p5 = new p5((sketch) => this.p5init(sketch), drawIntoElement || document.createElement('div'), true); // use existing element, or fake one.
 
     this.interpreter = new Interpreter(code, (interpreter, scope) => this.postScopeInit(interpreter, scope))
     
@@ -130,45 +133,54 @@ class SessionRunner {
   }
   
   stepAndSchedule() {
-    if (this.isFinished) {
-      this.p5.noLoop();
-      return;
-    }
-    if (this.deadline && this.deadline < Date.now()) {
-      // console.log("Execution timeout!");
-      this.p5.noLoop();
-      let stack = this.interpreter.stateStack;
-      let topFrame = stack.top();
-      this.passEvent("runtimeError", new Error("timeout"), topFrame, stack);
-      this.passEvent("stop", this.interpreter);
-      this.complete("timeout");
-      return;
-    }
-    try {
-      // let startTime = Date.now();
-      let result = this.interpreter.step();
-      // let totalTime = Date.now()-startTime;
-      // if (totalTime >= 1) {
-      //   console.log("Slow!", totalTime, this.interpreter.stateStack.top());
-      // }
-      if (result && ! this.isWaiting) {
-        setTimeout(this.stepAndSchedule.bind(this), this.evaluationDelay)
-      }
-      if (! result) {
-        this.isFinished = true;
+    let repeatDeadline = Date.now() + 50; //ms
+    for (;;) { // a loop that lets us continually step unless something happens.
+      if (this.isFinished) {
         this.p5.noLoop();
-        this.complete();
-        this.passEvent("stop", this.interpreter);
+        return;
       }
-    } catch (err) {
-      console.log(err);
-      this.p5.noLoop();
-      let stack = this.interpreter.stateStack;
-      let topFrame = stack.top();
-      console.log("runtimeError", err, topFrame, stack);
-      this.passEvent("runtimeError", err, topFrame, stack);
-      this.complete();
-      this.passEvent("stop", this.interpreter);
+      if (this.deadline && this.deadline < Date.now()) {
+        // console.log("Execution timeout!");
+        this.p5.noLoop();
+        let stack = this.interpreter.stateStack;
+        let topFrame = stack.top();
+        this.passEvent("runtimeError", new Error("timeout"), topFrame, stack);
+        this.passEvent("stop", this.interpreter);
+        this.complete("timeout");
+        return;
+      }
+      try {
+        // let startTime = Date.now();
+        let result = this.interpreter.step();
+        // let totalTime = Date.now()-startTime;
+        // if (totalTime >= 1) {
+        //   console.log("Slow!", totalTime, this.interpreter.stateStack.top());
+        // }
+        if (result && ! this.isWaiting) {
+          if (this.evaluationDelay > 0 || Date.now() > repeatDeadline) {
+            setTimeout(this.stepAndSchedule.bind(this), this.evaluationDelay);
+            return;
+          }
+          return this.stepAndSchedule();
+        }
+        if (! result) {
+          this.isFinished = true;
+          this.p5.noLoop();
+          this.complete();
+          this.passEvent("stop", this.interpreter);
+        }
+        return;
+      } catch (err) {
+        console.log(err);
+        this.p5.noLoop();
+        let stack = this.interpreter.stateStack;
+        let topFrame = stack.top();
+        console.log("runtimeError", err, topFrame, stack);
+        this.passEvent("runtimeError", err, topFrame, stack);
+        this.complete("runtime");
+        this.passEvent("stop", this.interpreter);
+        return;
+      }
     }
   }
   

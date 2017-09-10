@@ -205,13 +205,9 @@ class Rudy extends Component {
   
   refreshFrame() {
     if (this._canvasParent) {
-      // console.log("Creating runner with parent", this._canvasParent);
-      while(this._canvasParent && this._canvasParent.lastChild) {
-        this._canvasParent.removeChild(this._canvasParent.lastChild);
-      }
       let rudyRunner = new RudyRunner("", this.state.currentLevel, 0, this._canvasParent)
       rudyRunner.run((done) => {
-        // console.log("Done running initial paint run.");
+        // nothing to do here.
       }, true);
     }    
   }
@@ -236,6 +232,7 @@ class Rudy extends Component {
   
   
   updateCanvasParent(elt) {
+    console.log("updating canvas parent");
     this._canvasParent = elt
     this.refreshFrame();
   }
@@ -251,7 +248,7 @@ class Rudy extends Component {
     if (annotations && annotations.length > 0) {
       this._editor.clearErrors();
       annotations.forEach((x) => {
-        if (x.reason.startsWith("Unrecoverable syntax error")) {
+        if (annotations.length > 1 && x.reason.startsWith("Unrecoverable syntax error")) {
           return;
         }
         if (x.line > -1) {
@@ -269,7 +266,7 @@ class Rudy extends Component {
     this.rudyRunner = new RudyRunner(this._editor.currentCode(), this.state.currentLevel, Rudy.evaluationDelay(this.state.executionSpeed), this._canvasParent, this._editor)
     this.setState({ controllerState: 'running' }, () =>
       this.rudyRunner.run((success) => {
-        if (success) {
+        if (success === true) {
           this.setState({ everSolved: true });
         }
         this.stop();
@@ -345,7 +342,7 @@ class RudyDisplay extends Component {
   shouldComponentUpdate(newProps) {
     return false;
   }
-  
+
   render() {
     return <div id="rudy-canvas-parent" ref={ (elt) => this.props.updateCanvasParent(elt) } />
   }

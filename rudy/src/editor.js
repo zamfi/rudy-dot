@@ -94,7 +94,7 @@ class Editor extends Component {
           }
 					this.clearErrors();
           annotations.forEach((x) => {
-            if (x.message.startsWith("Unrecoverable syntax error")) {
+            if (annotations.length > 1 && x.message.startsWith("Unrecoverable syntax error")) {
               return;
             }
             console.log(x);
