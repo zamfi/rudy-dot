@@ -20,7 +20,7 @@ class Editor extends Component {
 		super(props);
 		this.beep = {
 			play() {
-				console.log("word!");
+        // console.log("word!");
 			}
 		}
     
@@ -28,7 +28,7 @@ class Editor extends Component {
 	}
   
 	createError(severity, line, ch, message, showMessage) {
-    console.log("LINT ERROR", severity, line, ch, message);
+    // console.log("LINT ERROR", severity, line, ch, message);
     // let elt = document.createElement('div');
     // elt.className = "callout errorbox";
     // elt.innerHTML = `<div class="close">&times;</div>
@@ -56,7 +56,7 @@ class Editor extends Component {
       }
     }
     messageBox.getElementsByClassName('close')[0].onclick = () => {
-      messageBox.parentElement.removeChild(messageBox);
+      messageBox.remove();
     }
     this._cm.addWidget({line:line+1, ch:ch}, charIndicator);
     var lineHandle = this._cm.addLineClass(line+1, 'wrap', 'line-warning');
@@ -66,7 +66,7 @@ class Editor extends Component {
 	clearErrors() {
     this.markedLines.forEach(line => this._cm.removeLineClass(line, 'wrap', 'line-warning'));
     this.markedLines = [];
-    Array.from(document.getElementsByClassName('error')).forEach((elt) => elt.parentElement.removeChild(elt));
+    Array.from(document.getElementsByClassName('error')).forEach((elt) => elt.remove());
 	}
   
   getNodePosition(node) {
@@ -97,7 +97,7 @@ class Editor extends Component {
             if (annotations.length > 1 && x.message.startsWith("Unrecoverable syntax error")) {
               return;
             }
-            console.log(x);
+            // console.log(x);
             if (x.from.line > -1) {
               this.createError(x.severity, (x.from.line - 1), x.from.ch, x.message);
             }
@@ -145,30 +145,73 @@ class Editor extends Component {
   highlightNode(frame, stack) {
     var nodeType = frame.node.type;
     if (nodeType === 'Program') { return; }
-    // var padding = "";
-    // var interpreter = this.get('runController');
     var startPos = this._cm.posFromIndex(frame.node.start);
     var endPos = this._cm.posFromIndex(frame.node.end);
-    // var nodeLineCh = interpreter.getNodeLineCh(node);
-    // var oldText = this._cm.getRange(startPos, endPos);
-
-    // console.log("evaluating node", frame.node, "at depth", stack.length);
+    
     var mark = this._cm.markText(startPos, endPos, {className:'eval'+stack.length});
 
-    frame.node.__extra = {
-      // visible: (nodeType == 'call' || nodeType == 'whileStmnt'),
-      pos: {start: startPos, end: endPos},
-      // text: this.get('codeArea').getRange(nodeLineCh.start, nodeLineCh.end)+"\n",
-      mark: mark
+    if (! frame.node.__extra) {
+      frame.node.__extra = {};
     }
+    frame.node.__extra.pos = {start: startPos, end: endPos};
+    if (! frame.node.__extra.marks) {
+      frame.node.__extra.marks = [];
+    }
+    frame.node.__extra.marks.push(mark);
   }
   unhighlightNode(frame, stack) {
     var nodeType = frame.node.name;
     if (nodeType === 'Program') { return; }
 
-    if (frame.node.__extra && frame.node.__extra.mark) {
-      frame.node.__extra.mark.clear();
+    if (frame.node.__extra && frame.node.__extra.marks) {
+      frame.node.__extra.marks.pop().clear();
     }
+  }
+
+  showGlobalVariables(frame) {
+    return frame.node.declarations.map(decl => {
+      let elt = document.createElement('div')
+      elt.className = "callout"
+      
+      let handler = new SingleVarTracker(frame.scope, decl, elt);
+      handler.render();
+
+      let pos = this._cm.posFromIndex(decl.init.start);
+      this._cm.addWidget(pos, elt);
+      
+      return handler;
+    });
+  }
+  
+  showFrameScope(frame) {
+    let node = frame.node;
+    let scope = frame.scope;
+    
+    let scopeViewElement = document.createElement('div');
+    let scopeHandler = new Scope(scope, scopeViewElement);
+    scopeHandler.render();
+    
+    let pos = this._cm.posFromIndex(node.start);
+    
+    this._cm.addWidget(pos, scopeViewElement);
+    node.__extra.scope = scopeHandler;
+
+    return scopeHandler;
+  }
+  
+  removeFrameScope(frame) {
+    if (frame.node.__extra && frame.node.__extra.scope) {
+      frame.node.__extra.scope.remove();
+    }
+  }
+  
+  clearFrameScopes() {
+    Array.from(document.getElementsByClassName('scope')).forEach(elt => elt.remove());
+    Array.from(document.getElementsByClassName('variable')).forEach(elt => elt.remove());
+  }
+  
+  showExpressionCalculation(frame) {
+    
   }
 }
 
@@ -177,5 +220,75 @@ Editor.lintOptions = {
   'eqeqeq': false,
   '-W041': false
 };
+
+class Scope {
+  constructor(scope, elt) {
+    this.scope = scope;
+    this.elt = elt;
+    this.elt.className = "callout";
+    this.showHidden = false;
+  }
+  
+  static stringValue(v) {
+    if (typeof(v) === 'object') {
+      switch(v.class) {
+      case 'Function':
+        return `function <strong>${v.nativeFunc ? (v.nativeFunc.name || v.__name) : (v.node.id ? v.node.id.name : "<em>anonymous</em>")}</strong>`;
+      case 'Array':
+        return `[${Array.from(v.properties).map(Scope.stringValue).join(', ')}]`;
+      default:
+        return String(v);
+      }
+    } else if (typeof(v) === 'string'){
+      return `"<strong>${v}</strong>"`
+    } else {
+      return `<strong>${String(v)}</strong>`;
+    }
+  }
+  
+  value(k) {
+    return Scope.stringValue(this.scope.properties[k]);
+  }
+  
+  render() {
+    this.elt.innerHTML = ['<table class="scope">',
+      this.scope.properties
+        ? Object.keys(this.scope.properties)
+            .filter(this.showHidden ? k => k : k => k !== 'this' && k !== 'arguments')
+            .map(k => `<tr class="scope-entry"><th>${k}</th><td>${this.value(k)}</td></tr>`)
+            .join("")
+        : "",
+      '</table>'].join('\n');
+          
+  }
+  
+  update() {
+    this.render();
+  }
+  
+  remove() {
+    this.elt.remove();
+  }
+}
+
+class SingleVarTracker {
+  constructor(scope, declaration, elt) {
+    this.scope = scope;
+    this.name = declaration.id.name;
+    this.elt = elt;
+  }
+  
+  render() {
+    this.elt.innerHTML = `<div class="variable">${Scope.stringValue(this.scope.properties[this.name])}</div>`
+  }
+  
+  update() {
+    this.render();
+  }
+  
+  remove() {
+    this.elt.remove();
+  }
+}
 
 export default Editor;

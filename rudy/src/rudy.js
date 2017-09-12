@@ -6,6 +6,7 @@ import { debounce, queryString } from './util';
 import Editor from './editor';
 import './rudy.css'
 import RudyRunner from './runner'
+import StackView from './stack'
 
 
 class Rudy extends Component {
@@ -27,6 +28,9 @@ class Rudy extends Component {
     [ 'run', 
       'stop', 
       'reset',
+      'pause',
+      'resume',
+      'step',
       'changeSpeed',
       'nextLevel',
       'previousLevel',
@@ -57,6 +61,9 @@ class Rudy extends Component {
           runFn={this.run}
           stopFn={this.stop} 
           resetFn={this.reset}
+          pauseFn={this.pause}
+          resumeFn={this.resume}
+          stepFn={this.step}
           changeSpeed={this.changeSpeed}
           currentLevel={this.state.currentLevel}
           nextLevel={this.state.clonedTo || this.state.everSolved ? this.nextLevel : false}
@@ -232,7 +239,7 @@ class Rudy extends Component {
   
   
   updateCanvasParent(elt) {
-    console.log("updating canvas parent");
+    // console.log("updating canvas parent");
     this._canvasParent = elt
     this.refreshFrame();
   }
@@ -263,8 +270,17 @@ class Rudy extends Component {
     this._editor.disableEditing();
     this.doSave(true);
     // console.log("Creating runner with parent", this._canvasParent);
-    this.rudyRunner = new RudyRunner(this._editor.currentCode(), this.state.currentLevel, Rudy.evaluationDelay(this.state.executionSpeed), this._canvasParent, this._editor)
-    this.setState({ controllerState: 'running' }, () =>
+    this.rudyRunner = new RudyRunner(
+      this._editor.currentCode(), 
+      this.state.currentLevel, 
+      Rudy.evaluationDelay(this.state.executionSpeed), 
+      this._canvasParent, 
+      this._editor,
+      this._stack);
+    this.setState({ 
+      controllerState: 'running',
+      latestCode: this._editor.currentCode()
+    }, () =>
       this.rudyRunner.run((success) => {
         if (success === true) {
           this.setState({ everSolved: true });
@@ -282,6 +298,26 @@ class Rudy extends Component {
     this._editor.enableEditing();
   }
   
+  pause() {
+    if (this.state.controllerState === 'running') {
+      this.setState({ controllerState: 'paused' });
+      this.rudyRunner.pause();
+    }
+  }
+  
+  resume() {
+    if (this.state.controllerState === 'paused') {
+      this.setState({ controllerState: 'running' });
+      this.rudyRunner.resume();
+    }
+  }
+  
+  step() {
+    if (this.state.controllerState === 'paused') {
+      this.rudyRunner.step();
+    }
+  }
+  
   reset() {
     // stub
   }
@@ -297,23 +333,27 @@ class Rudy extends Component {
 }
 
 class RudyToolbar extends Component {
-  button() {
+  buttons() {
     switch (this.props.runState) {
     case 'stopped':
-      return { title: "▶ Run", action: this.props.runFn }
+      return [{ type: 'run', title: "▶ Run", action: this.props.runFn }];
     case 'running':
-      return { title: "◼ Stop", action: this.props.stopFn }
+      return [{ type: 'pause', title: "‖ Pause", action: this.props.pauseFn }];
+    case 'paused':
+      return [{ type: 'resume', title: "▶ Resume", action: this.props.resumeFn }, 
+              { type: 'step', title: "➔ Step", action: this.props.stepFn },
+              { type: 'stop', title: "◼ Stop", action: this.props.stopFn }];
     default:
-      return { title: "Reset", action: this.props.resetFn }
+      return [{ type: 'reset', title: "Reset", action: this.props.resetFn }];
     }
   }
     
   render() {
-    let button = this.button();
+    let buttons = this.buttons();
     
     return <div className="toolbar">
         <div className="toolbar-entry">
-          <button className="run button" onClick={button.action}>{button.title}</button>
+          {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry">

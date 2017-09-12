@@ -98,9 +98,18 @@ html {
 	cursor: pointer;
 }
 
-.run.button {
+.run.button, .resume.button, .pause.button {
 	background: #0080FF;
 }
+
+.stop.button {
+  background: #FB1407;
+}
+
+.step.button {
+  background: #008000;
+}
+
 .advance.button {
   background: #008000;
 }
@@ -152,7 +161,7 @@ table p {
   margin: 0;
 }
 
-.rudy-syntax-helper table {
+table {
   padding: 0;
   margin: 0;
   border-collapse: collapse;
@@ -171,43 +180,108 @@ table p {
   text-align: right;
 }
 
+
+.stack-view {
+  position: absolute;
+  top: 5px;
+  right: 365px;
+  z-index: 1000;
+  display: inline-block;
+  width: 200px;
+  text-align: right;
+  border: 1px solid #ccc;
+  background: white;
+}
+
+.stack-scope-view {
+  border-left: 2px solid #fcc;
+}
+
+.stack-frame-view {
+  border-bottom: 2px solid #ccc;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.stack-frame-view .code-view {
+  display: inline-block;
+  text-align: left;
+}
+
 /* for evaluation */
+/* for i in 0...24 { print(".eval\(i) {\n  background: rgb(255, \(240-i*10), \(240-i*10));\n}") } */ 
 .eval0 {
   background: rgb(255, 240, 240);
 }
 .eval1 {
-  background: rgb(255, 220, 220);
+  background: rgb(255, 230, 230);
 }
 .eval2 {
-  background: rgb(255, 200, 200);
+  background: rgb(255, 220, 220);
 }
 .eval3 {
-  background: rgb(255, 180, 180);
+  background: rgb(255, 210, 210);
 }
 .eval4 {
-  background: rgb(255, 160, 160);
+  background: rgb(255, 200, 200);
 }
 .eval5 {
-  background: rgb(255, 140, 140);
+  background: rgb(255, 190, 190);
 }
 .eval6 {
-  background: rgb(255, 120, 120);
+  background: rgb(255, 180, 180);
 }
 .eval7 {
-  background: rgb(255, 100, 100);
+  background: rgb(255, 170, 170);
 }
 .eval8 {
-  background: rgb(255, 80, 80);
+  background: rgb(255, 160, 160);
 }
 .eval9 {
-  background: rgb(255, 60, 60);
+  background: rgb(255, 150, 150);
 }
 .eval10 {
-  background: rgb(255, 40, 40);
+  background: rgb(255, 140, 140);
 }
 .eval11 {
-  background: rgb(255, 20, 20);
+  background: rgb(255, 130, 130);
 }
 .eval12 {
+  background: rgb(255, 120, 120);
+}
+.eval13 {
+  background: rgb(255, 110, 110);
+}
+.eval14 {
+  background: rgb(255, 100, 100);
+}
+.eval15 {
+  background: rgb(255, 90, 90);
+}
+.eval16 {
+  background: rgb(255, 80, 80);
+}
+.eval17 {
+  background: rgb(255, 70, 70);
+}
+.eval18 {
+  background: rgb(255, 60, 60);
+}
+.eval19 {
+  background: rgb(255, 50, 50);
+}
+.eval20 {
+  background: rgb(255, 40, 40);
+}
+.eval21 {
+  background: rgb(255, 30, 30);
+}
+.eval22 {
+  background: rgb(255, 20, 20);
+}
+.eval23 {
+  background: rgb(255, 10, 10);
+}
+.eval24 {
   background: rgb(255, 0, 0);
 }

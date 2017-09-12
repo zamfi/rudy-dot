@@ -55,3 +55,41 @@
   border-radius: 3px;
   background: rgba(255, 238, 238, 0.55);
 }
+
+.callout .scope {
+  display: inline-block;
+  position: relative;
+  left: 15px;
+  top: -15px;
+  border: 2px dotted #ec3;
+  border-radius: 10px;
+  padding: 3px;
+  background: rgba(255, 238, 212, 0.85);
+  box-shadow: 3px 3px 4px 1px #ca3;
+  
+}
+
+.scope-entry th {
+  font-weight: normal;
+  font-style: italic;
+  text-align: right;
+  padding: 0 7px 0 2px;
+  border-right: 1px solid #ec3;
+}
+
+.scope-entry td {
+  padding-left: 7px;
+}
+
+.callout .variable {
+  display: inline-block;
+  position: relative;
+  left: -3px;
+  top: -19px;
+  border: 2px dotted #ec3;
+  border-radius: 5px;
+  padding: 2px;
+  background: rgba(255, 238, 212, 0.85);
+  box-shadow: 2px 4px 4px 1px #ca3;
+  
+}

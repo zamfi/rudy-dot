@@ -2,22 +2,48 @@ import Interpreter from 'js-interpreter'
 import p5 from 'p5'
 
 class RudyRunner {
-  constructor(code, level, evaluationDelay, parentElement, editor) {
+  constructor(code, level, evaluationDelay, parentElement, editor, stackView) {
     this.parentElement = parentElement;
     this.level = level;
     this.code = code;
     this.evaluationDelay = evaluationDelay;
     this.editor = editor;
+    this.stackView = stackView;
+    
+    this.visibleScopes = [];
   }
   
   nodeEvaluationHandler(frame, stack) {
     if (this.editor) {
       this.editor.highlightNode(frame, stack);
+      let previousFrame = stack[stack.length-1];
+      if (frame.node.type === "BlockStatement" && previousFrame.node.type === "CallExpression") {
+        // show the parent scope
+        this.visibleScopes.push(this.editor.showFrameScope(frame));
+      }
+    }
+    if (this.stackView) {
+      this.stackView.addNode(frame);
     }
   }
   nodeEvaluationDoneHandler(frame, stack) {
     if (this.editor) {
       this.editor.unhighlightNode(frame, stack);
+      let previousFrame = stack[stack.length-2]; // frame is top of stack
+      if (frame.node.type === "BlockStatement" && previousFrame.node.type === "CallExpression") {
+        // call is done, remove it.
+        this.editor.removeFrameScope(frame);
+        this.visibleScopes.pop();
+      } else {
+        this.visibleScopes.forEach((scope) => scope.update());
+      }
+      if (frame.node.type === "VariableDeclaration" && frame.scope.parentScope === null) { 
+        // global variable -- add a viewer for just this variable!
+        this.visibleScopes.push(...this.editor.showGlobalVariables(frame));
+      }
+    }
+    if (this.stackView) {
+      this.stackView.removeNode(frame);
     }
   }
   
@@ -38,7 +64,7 @@ class RudyRunner {
         lastSeed = await this.sampleExecution(deadline)
       }
     } catch (seed) {
-      console.log("Something failed?", seed, typeof seed, typeof seed === 'number');
+      // console.log("Something failed?", seed, typeof seed, typeof seed === 'number');
       if (typeof seed === 'number') {
         lastSeed = seed;
       } else {
@@ -80,10 +106,22 @@ class RudyRunner {
 
     // XXX This is caused by a bug that only shows up in Safari where the canvas isn't made visible...
     if (this.parentElement.firstChild.dataset.hidden === 'true') {
-      console.log("Showing because was still hidden #racecondition");
+      console.error("Showing because was still hidden #racecondition");
       this.parentElement.firstChild.style.visibility = '';
       delete this.parentElement.firstChild.dataset.hidden
     }
+  }
+  
+  pause() {
+    this.runner.pause();
+  }
+  
+  resume() {
+    this.runner.resume();
+  }
+  
+  step() {
+    this.runner.step();
   }
   
   stop() {
@@ -92,11 +130,17 @@ class RudyRunner {
   
   stopHandler(interpreter) {
     let stack = interpreter.stateStack;
-    stack.forEach(function(frame) {
-      if (frame.node && frame.node.__extra) {
-        frame.node.__extra.mark.clear();
+    stack.forEach(frame => {
+      if (frame.node && frame.node.__extra && frame.node.__extra.marks) {
+        frame.node.__extra.marks.forEach(m => m.clear());
       }
     });
+    if (this.editor) {
+      this.editor.clearFrameScopes();
+    }
+    if (this.stackView) {
+      this.stackView.clear();
+    }
   }
   
   setEvaluationDelay(delay) {
@@ -139,6 +183,9 @@ class SessionRunner {
         this.p5.noLoop();
         return;
       }
+      if (this.isPaused) {
+        return;
+      }
       if (this.deadline && this.deadline < Date.now()) {
         // console.log("Execution timeout!");
         this.p5.noLoop();
@@ -150,12 +197,7 @@ class SessionRunner {
         return;
       }
       try {
-        // let startTime = Date.now();
-        let result = this.interpreter.step();
-        // let totalTime = Date.now()-startTime;
-        // if (totalTime >= 1) {
-        //   console.log("Slow!", totalTime, this.interpreter.stateStack.top());
-        // }
+        let result = this.step();
         if (result && ! this.isWaiting) {
           if (this.evaluationDelay > 0 || Date.now() > repeatDeadline) {
             setTimeout(this.stepAndSchedule.bind(this), this.evaluationDelay);
@@ -163,25 +205,39 @@ class SessionRunner {
           }
           return this.stepAndSchedule();
         }
-        if (! result) {
-          this.isFinished = true;
-          this.p5.noLoop();
-          this.complete();
-          this.passEvent("stop", this.interpreter);
-        }
         return;
       } catch (err) {
-        console.log(err);
+        // console.error(err);
         this.p5.noLoop();
         let stack = this.interpreter.stateStack;
         let topFrame = stack.top();
-        console.log("runtimeError", err, topFrame, stack);
+        console.error("runtimeError", err, topFrame, stack);
         this.passEvent("runtimeError", err, topFrame, stack);
         this.complete("runtime");
         this.passEvent("stop", this.interpreter);
         return;
       }
     }
+  }
+  
+  pause() {
+    this.isPaused = true;
+  }
+  
+  resume() {
+    delete this.isPaused;
+    this.stepAndSchedule();
+  }
+  
+  step() {
+    let result = this.interpreter.step();
+    if (! result) {
+      this.isFinished = true;
+      this.p5.noLoop();
+      this.complete();
+      this.passEvent("stop", this.interpreter);
+    }
+    return result;
   }
   
   stop() {
@@ -217,13 +273,20 @@ class SessionRunner {
     }
   }
   
+  createNamedNativeFunction(interpreter, f, name) {
+    let nativeFunction = interpreter.createNativeFunction(f);
+    nativeFunction.__name = name;
+    return nativeFunction;
+  }
+  
   postScopeInit(interpreter, scope) {
-    interpreter.setProperty(scope, 'log', interpreter.createNativeFunction(console.log.bind(console)));
+    let logFunction = this.parentElement ? console.log.bind(console) : function() {};
+    interpreter.setProperty(scope, 'log', this.createNamedNativeFunction(interpreter, logFunction, 'log'));
     ['getColor', 'setColor', 'remainingDots'].forEach(name => 
-      interpreter.setProperty(scope, name, interpreter.createNativeFunction(this[name].bind(this)))
+      interpreter.setProperty(scope, name, this.createNamedNativeFunction(interpreter, this[name].bind(this), name))
     );
     ['down', 'up', 'left', 'right'].forEach(name =>
-      interpreter.setProperty(scope, name, interpreter.createNativeFunction(this.wrapAsyncFunction(this[name].bind(this))))
+      interpreter.setProperty(scope, name, this.createNamedNativeFunction(interpreter, this.wrapAsyncFunction(this[name].bind(this)), name))
     );
   }
   
