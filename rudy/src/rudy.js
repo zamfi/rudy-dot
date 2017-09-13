@@ -42,7 +42,7 @@ class Rudy extends Component {
     
     let saveSoon = debounce(() => this.doSave(), 2000);
     this.saveSoon = () => {
-      console.log("save soon!");
+      // console.log("save soon!");
       this.setState({saveState: 'saving'});
       saveSoon();
     }
@@ -57,7 +57,6 @@ class Rudy extends Component {
     }
     
     window.onpopstate = (event) => {
-      console.log("state change!", this.getUrlSketchId(), event);
       this.loadSketch(this.getUrlSketchId());
     }
   }  
