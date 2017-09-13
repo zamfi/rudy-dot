@@ -81,7 +81,7 @@ class Rudy extends Component {
         <div className="editor-panel">
           <Editor initialCode={this.state.loadedCode} ref={(ed) => this._editor = ed} onChange={this.codeChangeHandler}/>
 {/*          <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> */}
-          <RudySidebar updateCanvasParent={this.updateCanvasParent} refreshFrame={this.refreshFrame}/>
+          <RudySidebar updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState != 'stopped'} refreshFrame={this.refreshFrame}/>
         </div>
       </div>
     );
@@ -389,7 +389,7 @@ class RudySidebar extends Component {
   render() {
     return <div id="rudy-sidebar">
       <RudyDisplay {...this.props} />
-      <div className="canvas-toolbar"><button className="button refresh" onClick={this.props.refreshFrame}>⟳ Refresh</button></div>
+      <div className="canvas-toolbar"><button className="button refresh" disabled={this.props.isRunning} onClick={this.props.refreshFrame}>⟳ Refresh</button></div>
       <RudySyntaxHelper />
     </div>
   }

@@ -221,6 +221,10 @@ table {
 .button.refresh {
   background: #999;
 }
+.button.refresh:disabled {
+  background: #ccc;
+  cursor: wait;
+}
 
 /* for evaluation */
 /* for i in 0...24 { print(".eval\(i) {\n  background: rgb(255, \(240-i*10), \(240-i*10));\n}") } */ 
