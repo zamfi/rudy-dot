@@ -42,9 +42,6 @@ class StackView extends Component {
 
 function NodeView(props) {
   let keys = Object.keys(props.node).filter(k => props.node.hasOwnProperty(k));
-  if (props.node.type === "VariableDeclaration") {
-    console.log("node with declarations", props.node);
-  }
   return <div className="stack-node-view">
       {keys.map(k => <div key={k}>{`node-${k}: ${props.node[k]}`}</div>)}
     </div>;

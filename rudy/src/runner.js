@@ -13,7 +13,12 @@ class RudyRunner {
     this.visibleScopes = [];
   }
   
+  static shouldCalloutExpressionEvaluation(type) {
+    return type === "BinaryExpression" || type === "CallExpression" || type === "UnaryExpression"; // || type === "Identifier";
+  }
+  
   nodeEvaluationHandler(frame, stack) {
+    // frame is not yet on the stack
     if (this.editor) {
       this.editor.highlightNode(frame, stack);
       let previousFrame = stack[stack.length-1];
@@ -21,12 +26,28 @@ class RudyRunner {
         // show the parent scope
         this.visibleScopes.push(this.editor.showFrameScope(frame));
       }
+      if (RudyRunner.shouldCalloutExpressionEvaluation(frame.node.type)) {
+        this.runner.runAfterStep(() => {
+          // frame will be on the stack already
+          if (previousFrame && 
+              ! RudyRunner.shouldCalloutExpressionEvaluation(previousFrame.node.type) &&
+              ! (previousFrame.node.type === "AssignmentExpression" && frame.node === previousFrame.node.left)) {
+            this.editor.createEvaluationCallout(this.code, stack, frame);
+          }
+        });
+      }
+      if (frame.node.type === 'BlockStatement' && previousFrame.node.__extra && previousFrame.node.__extra.expressionView) {
+        this.runner.runBeforeStep(() => {
+          this.editor.removeEvaluationCallout(previousFrame.node.__extra.expressionView);
+        });
+      }
     }
     if (this.stackView) {
       this.stackView.addNode(frame);
     }
   }
   nodeEvaluationDoneHandler(frame, stack) {
+    // frame is still on the stack
     if (this.editor) {
       this.editor.unhighlightNode(frame, stack);
       let previousFrame = stack[stack.length-2]; // frame is top of stack
@@ -38,8 +59,20 @@ class RudyRunner {
         this.visibleScopes.forEach((scope) => scope.update());
       }
       if (frame.node.type === "VariableDeclaration" && frame.scope.parentScope === null) { 
-        // global variable -- add a viewer for just this variable!
+        // global variable -- add a viewer for just this/these variable(s)!
         this.visibleScopes.push(...this.editor.showGlobalVariables(frame));
+      }
+      // this.runner.runAfterStep(() => {
+      //   // frame won't be on the stack anymore
+      //   if (RudyRunner.shouldCalloutExpressionEvaluation(frame.node.type) || frame.node.type === "Literal" || (frame.node.__extra && frame.node.__extra.expressionView)) {
+      //     this.editor.updateEvaluationCallout(stack, null);
+      //   }
+      //   console.log('popped!', frame);
+      // });
+      if (frame.node.__extra && frame.node.__extra.expressionView ) {
+        this.runner.runBeforeStep(() => {
+          this.editor.removeEvaluationCallout(frame.node.__extra.expressionView);
+        });
       }
     }
     if (this.stackView) {
@@ -77,7 +110,7 @@ class RudyRunner {
   sampleExecution(deadline) {
     return new Promise((resolve, reject) => {
       let seed = Date.now() + Math.floor(Math.random() * 10000000000);
-      this.runner = new SessionRunner(this.code, this.level, 0, seed, null, null);
+      this.runner = new SessionRunner(this.code, this.level, 0, seed);
       this.runner.deadline = deadline;
       this.runner.run((success) => {
         if (success) {
@@ -101,7 +134,7 @@ class RudyRunner {
     while(this.parentElement.lastChild) {
       this.parentElement.removeChild(this.parentElement.lastChild);
     }
-    this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.parentElement);
+    this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.editor, this.parentElement, this.stackView);
     this.runner.run(doneCb);
 
     // XXX This is caused by a bug that only shows up in Safari where the canvas isn't made visible...
@@ -137,6 +170,7 @@ class RudyRunner {
     });
     if (this.editor) {
       this.editor.clearFrameScopes();
+      this.editor.clearEvaluations();
     }
     if (this.stackView) {
       this.stackView.clear();
@@ -152,13 +186,15 @@ class RudyRunner {
 }
 
 class SessionRunner {
-  constructor(code, level, evaluationDelay, randomSeed, eventHandler, drawIntoElement) {
+  constructor(code, level, evaluationDelay, randomSeed, eventHandler, editor, drawIntoElement, stackView) {
     // console.log("session running drawing into", drawIntoElement);
     this.randomSeed = randomSeed;
     this.parentElement = drawIntoElement;
     this.evaluationDelay = evaluationDelay;
     this.startLevel = level;
     this.eventHandler = eventHandler;
+    this.editor = editor;
+    this.stackView = stackView;
 
     this.allHues = {
       "red": {r: 255, g: 220, b: 220},
@@ -220,6 +256,19 @@ class SessionRunner {
     }
   }
   
+  runAfterStep(cb) {
+    if (! this._afterStepCallbacks) {
+      this._afterStepCallbacks = [];
+    }
+    this._afterStepCallbacks.push(cb);
+  }
+  runBeforeStep(cb) {
+    if (! this._beforeStepCallbacks) {
+      this._beforeStepCallbacks = [];
+    }
+    this._beforeStepCallbacks.push(cb);
+  }
+  
   pause() {
     this.isPaused = true;
   }
@@ -229,8 +278,34 @@ class SessionRunner {
     this.stepAndSchedule();
   }
   
+  _preStep() {
+    if (this._beforeStepCallbacks) {
+      this._beforeStepCallbacks.forEach(cb => cb());
+      delete this._beforeStepCallbacks;
+    }
+  }
+  
+  _postStep() {
+    if (this._afterStepCallbacks) {
+      this._afterStepCallbacks.forEach(cb => cb());
+      delete this._afterStepCallbacks;
+    }
+    if (this.editor && this.editor.hasActiveEvaluationCallouts()) {
+      this.editor.updateEvaluationCallout(this.interpreter.stateStack, this.interpreter.stateStack.top());
+    }
+    if (this.stackView) {
+      this.stackView.forceUpdate();
+    }
+  }
+  
   step() {
+    this._preStep();
+
+    // WOO, ACTUALLY RUN THE STEP!
     let result = this.interpreter.step();
+
+    this._postStep();
+    
     if (! result) {
       this.isFinished = true;
       this.p5.noLoop();
@@ -934,64 +1009,3 @@ class GateSet {
 }
 
 export default RudyRunner
-
-// var processingInstance;
-// var sampleInstance;
-// var lastSeed;
-// var doneRunningSamples = false;
-// var samplesDeadline = Date.now() + 500;
-// function sampleExecution(userCode, controller, cb) {
-//   if (sampleInstance) {
-//     sampleInstance.noLoop();
-//     // console.log(processingInstance);
-//   }
-//   var canvas = document.getElementById('sample');
-//
-//   lastSeed = Date.now() + Math.floor(Math.random() * 10000000000);
-//   console.log("running sample with seed", lastSeed);
-//   var start = Date.now();
-//   sampleInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, lastSeed, samplesDeadline, function(success) {
-//     if (! success) {
-//       cb();
-//     } else {
-//       setTimeout(function() {
-//         if (! doneRunningSamples) {
-//           sampleExecution(userCode, controller, cb);
-//         }
-//       }, 0);
-//     }
-//   }));
-// }
-//
-// function executeCode(userCode, controller) {
-//   var canvas = document.getElementById('pjs');
-//   var expiredTimeout;
-//   function doRealExecution(seed) {
-//     console.log("DONE RUNNING SAMPLES");
-//     doneRunningSamples = true;
-//     if (expiredTimeout) {
-//       clearTimeout(expiredTimeout);
-//       expiredTimeout = null;
-//     }
-//     if (processingInstance) {
-//       processingInstance.noLoop();
-//       // console.log(processingInstance);
-//     }
-//     if (sampleInstance) {
-//       sampleInstance.noLoop();
-//     }
-//     processingInstance = new Processing(canvas, sketchProc(userCode, controller.get('level'), controller, seed, undefined, undefined));
-//   }
-//   expiredTimeout = setTimeout(function() {
-//     expiredTimeout = null;
-//     doRealExecution(lastSeed);
-//   }, 500);
-//   doneRunningSamples = false;
-//   sampleExecution(userCode, controller, function() {
-//     doRealExecution(lastSeed);
-//   });
-// }
-//
-// window.ProcessingWrapper = {
-//   executeCode: executeCode
-// }

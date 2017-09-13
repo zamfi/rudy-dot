@@ -93,3 +93,19 @@
   box-shadow: 2px 4px 4px 1px #ca3;
   
 }
+
+.callout .expression-list {
+  position: relative;
+  background: rgba(238, 255, 212, 0.85);
+  border: 1px solid #ce3;
+  border-radius: 5px;
+  padding: 0 3px 3px 3px;
+  left: -4px;
+  text-align: center;
+  box-shadow: 2px 3px 3px #ac3;
+}
+
+.callout .expression-list .node-code {
+  height: 0px;
+  overflow: hidden;
+}

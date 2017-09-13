@@ -70,6 +70,7 @@ class Rudy extends Component {
           previousLevel={this.state.clonedFrom ? this.previousLevel : false}/>
         <div className="editor-panel">
           <Editor initialCode={this.state.loadedCode} ref={(ed) => this._editor = ed} onChange={this.codeChangeHandler}/>
+{/*          <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> */}
           <RudySidebar updateCanvasParent={this.updateCanvasParent} />
         </div>
       </div>
