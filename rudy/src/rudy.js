@@ -407,7 +407,7 @@ class RudyDisplay extends Component {
 
 class SaveWidget extends Component {
   render() {
-    return <div className="toolbar-entry">
+    return <div className="toolbar-entry save">
       <span className={`label save ${this.props.status}`}>{this.props.label}</span>
     </div>
   }

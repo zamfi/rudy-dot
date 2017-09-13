@@ -23,6 +23,11 @@
 	font-size: 14px;
 }
 
+.toolbar-entry.save {
+  text-align: center;
+  width: 45px;
+}
+
 .toolbar-entry:last-child {
 	margin: 0;
 }
