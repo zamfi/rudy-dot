@@ -40,7 +40,13 @@ class Rudy extends Component {
       'refreshFrame'
     ].forEach(name => this[name] = this[name].bind(this))
     
-    this.saveSoon = debounce(() => this.doSave(), 2000)
+    let saveSoon = debounce(() => this.doSave(), 2000);
+    this.saveSoon = () => {
+      console.log("save soon!");
+      this.setState({saveState: 'saving'});
+      saveSoon();
+    }
+    this.saveSoon.cancel = saveSoon.cancel;
   }
   
   componentDidMount() {
@@ -48,6 +54,11 @@ class Rudy extends Component {
     
     if (sketchId !== undefined) {
       this.loadSketch(sketchId);
+    }
+    
+    window.onpopstate = (event) => {
+      console.log("state change!", this.getUrlSketchId(), event);
+      this.loadSketch(this.getUrlSketchId());
     }
   }  
   
@@ -71,7 +82,7 @@ class Rudy extends Component {
         <div className="editor-panel">
           <Editor initialCode={this.state.loadedCode} ref={(ed) => this._editor = ed} onChange={this.codeChangeHandler}/>
 {/*          <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> */}
-          <RudySidebar updateCanvasParent={this.updateCanvasParent} />
+          <RudySidebar updateCanvasParent={this.updateCanvasParent} refreshFrame={this.refreshFrame}/>
         </div>
       </div>
     );
@@ -125,13 +136,15 @@ class Rudy extends Component {
       let json = await res.json();
       if (json.status === 'ok') {
         // force a save if there's one pending
-        if (this.saveSoon.cancel()) {
+        if (this.saveSoon.cancel && this.saveSoon.cancel()) {
           await this.doSave();
         }
         let url = `/edit/${json.sketchId}`;
         if (window.location.pathname !== url) {
           window.history.pushState(json, null, url);
         }
+        let saveSoon = this.saveSoon;
+        this.saveSoon = () => {};
         this.setState({
           sketchId: json.sketchId,
           clonedFrom: json.extra ? json.extra.clonedFrom : null,
@@ -144,6 +157,7 @@ class Rudy extends Component {
         }, () => {
           this.refreshFrame();
           this._editor.setCode(json.code);
+          this.saveSoon = saveSoon;
         });
       } else {
         this.setState({
@@ -207,7 +221,6 @@ class Rudy extends Component {
   }
 
   codeChangeHandler() {
-    this.setState({saveState: 'saving'});
     this.saveSoon()
   }
   
@@ -375,7 +388,11 @@ class RudyToolbar extends Component {
 
 class RudySidebar extends Component {
   render() {
-    return <div id="rudy-sidebar"><RudyDisplay {...this.props} /><RudySyntaxHelper /></div>
+    return <div id="rudy-sidebar">
+      <RudyDisplay {...this.props} />
+      <div className="canvas-toolbar"><button className="button refresh" onClick={this.props.refreshFrame}>⟳ Refresh</button></div>
+      <RudySyntaxHelper />
+    </div>
   }
 }
 

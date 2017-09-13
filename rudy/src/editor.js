@@ -126,9 +126,7 @@ class Editor extends Component {
 	}
   
   setCode(code) {
-    this._cm.off('change', this.props.onChange);
     this._cm.getDoc().setValue(code);
-    this._cm.on('change', this.props.onChange);
   }
   
   disableEditing() {

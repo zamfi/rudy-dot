@@ -66,8 +66,9 @@ html {
 
 #rudy-canvas-parent {
 	display: block;
-	width: 360px;
-	height: 360px;
+	width: 340px;
+	height: 340px;
+  padding: 0 10px;
 }
 
 #rudy-sidebar {
@@ -206,6 +207,14 @@ table {
 .stack-frame-view .code-view {
   display: inline-block;
   text-align: left;
+}
+
+.canvas-toolbar {
+  text-align: right;
+}
+
+.button.refresh {
+  background: #999;
 }
 
 /* for evaluation */
