@@ -177,7 +177,7 @@ class Editor extends Component {
       let handler = new SingleVarTracker(frame.scope, decl, elt);
       handler.render();
 
-      let pos = this._cm.posFromIndex(decl.init.start);
+      let pos = this._cm.posFromIndex(decl.init ? decl.init.start : decl.end);
       this._cm.addWidget(pos, elt);
       
       return handler;
