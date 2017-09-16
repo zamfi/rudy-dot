@@ -14,7 +14,7 @@ class RudyRunner {
   }
   
   static shouldCalloutExpressionEvaluation(type) {
-    return type === "BinaryExpression" || type === "CallExpression" || type === "UnaryExpression"; // || type === "Identifier";
+    return type === "BinaryExpression" || type === "CallExpression" || type === "UnaryExpression" || type === "LogicalExpression"; // || type === "Identifier";
   }
   
   nodeEvaluationHandler(frame, stack) {
