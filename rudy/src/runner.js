@@ -3,7 +3,7 @@ import p5 from 'p5'
 import {extra, flattenStack} from './util'
 import {Scope} from './editor'
 
-class RudyRunner {
+class CodeRunner {
   constructor(code, level, evaluationDelay, parentElement, editor, stackView) {
     this.parentElement = parentElement;
     this.level = level;
@@ -73,7 +73,7 @@ class RudyRunner {
   }
   
   static shouldMaintainExpressionDemonstrator(type) {
-    return RudyRunner.shouldTriggerExpressionDemonstrator(type) || type === "Literal";
+    return CodeRunner.shouldTriggerExpressionDemonstrator(type) || type === "Literal";
   }
   
   static shouldPauseExpressionDemonstrator(type) {
@@ -90,7 +90,7 @@ class RudyRunner {
         // show the parent scope
         this.visibleScopes.push(this.editor.showFrameScope(frame));
       }
-      if (RudyRunner.shouldTriggerExpressionDemonstrator(frame.node.type) && ! this.activeExpressionDemonstrator) {
+      if (CodeRunner.shouldTriggerExpressionDemonstrator(frame.node.type) && ! this.activeExpressionDemonstrator) {
         this.runAfterStep(() => {
           // frame will be on the stack already
           let elt = this.editor.createExpressionDemonstratorCallout(frame.node.start);
@@ -98,7 +98,11 @@ class RudyRunner {
           extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
         });
       } else if (this.activeExpressionDemonstrator) {
-        if (RudyRunner.shouldPauseExpressionDemonstrator(frame.node.type)) {
+        if (CodeRunner.shouldPauseExpressionDemonstrator(frame.node.type)) {
+          let demonstrator = this.activeExpressionDemonstrator;
+          this.runAfterStep(() => {
+            demonstrator.stepComplete();
+          });
           delete this.activeExpressionDemonstrator;
         } else {
           extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
@@ -151,18 +155,6 @@ class RudyRunner {
         // console.log("recalling demonstrator", extra(previousFrame).expressionDemonstrator);
         this.activeExpressionDemonstrator = extra(previousFrame).expressionDemonstrator;
       }
-      // this.runner.runAfterStep(() => {
-      //   // frame won't be on the stack anymore
-      //   if (RudyRunner.shouldCalloutExpressionEvaluation(frame.node.type) || frame.node.type === "Literal" || (frame.node.__extra && frame.node.__extra.expressionView)) {
-      //     this.editor.updateEvaluationCallout(stack, null);
-      //   }
-      //   console.log('popped!', frame);
-      // });
-      // if (frame.node.__extra && frame.node.__extra.expressionView ) {
-      //   this.runner.runBeforeStep(() => {
-      //     this.editor.removeEvaluationCallout(frame.node.__extra.expressionView);
-      //   });
-      // }
     }
     if (this.stackView) {
       this.stackView.removeNode(frame);
@@ -229,7 +221,7 @@ class RudyRunner {
   sampleExecution(deadline) {
     return new Promise((resolve, reject) => {
       let seed = Date.now() + Math.floor(Math.random() * 10000000000);
-      this.runner = new SessionRunner(this.code, this.level, 0, seed);
+      this.runner = new RudyRunner(this.code, this.level, 0, seed);
       this.runner.deadline = deadline;
       this.runner.run((success) => {
         if (success) {
@@ -253,7 +245,7 @@ class RudyRunner {
     while(this.parentElement.lastChild) {
       this.parentElement.removeChild(this.parentElement.lastChild);
     }
-    this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.parentElement);
+    this.runner = new RudyRunner(this.code, this.level, this.evaluationDelay, seed, this, this.parentElement);
     this.runner.run(doneCb);
 
     // XXX This is caused by a bug that only shows up in Safari where the canvas isn't made visible...
@@ -357,6 +349,9 @@ class ExpressionDemonstrator {
     if (endIndex < this.rootFrameIndex) {
       let frame = this.frameAt(endIndex);
       if (frame) {
+        if (frame.node.type === "AssignmentExpression" && frame.doneLeft_ && !frame.doneRight_) {
+          return this.code.slice(frame.node.left.start, frame.node.left.end);
+        }
         let strVal = Scope.stringValue(frame.value, false);
         return strVal;
       }
@@ -471,7 +466,7 @@ class ExpressionDemonstrator {
   }
 
   render() {
-    // console.log("rendering stack", flattenStack(this.stack), this.rootFrameIndex, this._latestFrame);
+    console.log("rendering stack", flattenStack(this.stack), this.rootFrameIndex, this._latestFrame);
     let line = this.subRender(this.rootFrameIndex, this.lastIndex());
     if (this.lines.length === 0) {
       if (line !== this.nodeCode && line !== 'undefined' && line !== null) {
@@ -481,12 +476,12 @@ class ExpressionDemonstrator {
       this.lines.push(line);
     }
     let result = this.lines.length === 0 ? "" : `<div class="expression-list"><div class="node-code">${this.nodeCode}</div>${this.lines.map(line => `<div class="expression">${line}</div>`).join("")}</div>`;
-    // console.log("got from render", this.lines, result);
+    console.log("got from render", this.lines, result);
     return result;
   }
 }
 
-class SessionRunner {
+class RudyRunner {
   constructor(code, level, evaluationDelay, randomSeed, eventHandler, drawIntoElement) {
     // console.log("session running drawing into", drawIntoElement);
     this.randomSeed = randomSeed;
@@ -1282,4 +1277,4 @@ class GateSet {
   }
 }
 
-export default RudyRunner
+export default CodeRunner

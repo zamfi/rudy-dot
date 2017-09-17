@@ -5,7 +5,7 @@ import { debounce, queryString } from './util';
 
 import Editor from './editor';
 import './rudy.css'
-import RudyRunner from './runner'
+import CodeRunner from './runner'
 import StackView from './stack'
 
 
@@ -225,8 +225,8 @@ class Rudy extends Component {
   
   refreshFrame() {
     if (this._canvasParent) {
-      let rudyRunner = new RudyRunner("", this.state.currentLevel, 0, this._canvasParent)
-      rudyRunner.run((done) => {
+      let codeRunner = new CodeRunner("", this.state.currentLevel, 0, this._canvasParent)
+      codeRunner.run((done) => {
         // nothing to do here.
       }, true);
     }    
@@ -283,7 +283,7 @@ class Rudy extends Component {
     this._editor.disableEditing();
     this.doSave(true);
     // console.log("Creating runner with parent", this._canvasParent);
-    this.rudyRunner = new RudyRunner(
+    this.codeRunner = new CodeRunner(
       this._editor.currentCode(), 
       this.state.currentLevel, 
       Rudy.evaluationDelay(this.state.executionSpeed), 
@@ -294,7 +294,7 @@ class Rudy extends Component {
       controllerState: 'running',
       latestCode: this._editor.currentCode()
     }, () =>
-      this.rudyRunner.run((success) => {
+      this.codeRunner.run((success) => {
         if (success === true) {
           this.setState({ everSolved: true });
         }
@@ -306,7 +306,7 @@ class Rudy extends Component {
   stop() {
     if (this.state.controllerState !== 'stopped') {
       this.setState({ controllerState: 'stopped' });
-      this.rudyRunner.stop();
+      this.codeRunner.stop();
     }
     this._editor.enableEditing();
   }
@@ -314,20 +314,20 @@ class Rudy extends Component {
   pause() {
     if (this.state.controllerState === 'running') {
       this.setState({ controllerState: 'paused' });
-      this.rudyRunner.pause();
+      this.codeRunner.pause();
     }
   }
   
   resume() {
     if (this.state.controllerState === 'paused') {
       this.setState({ controllerState: 'running' });
-      this.rudyRunner.resume();
+      this.codeRunner.resume();
     }
   }
   
   step() {
     if (this.state.controllerState === 'paused') {
-      this.rudyRunner.step();
+      this.codeRunner.step();
     }
   }
   
@@ -338,8 +338,8 @@ class Rudy extends Component {
   changeSpeed(event) {
     let executionSpeed = event.target.value
     this.setState({ executionSpeed });
-    if (this.rudyRunner) {
-      this.rudyRunner.setEvaluationDelay(Rudy.evaluationDelay(executionSpeed));
+    if (this.codeRunner) {
+      this.codeRunner.setEvaluationDelay(Rudy.evaluationDelay(executionSpeed));
     }
     this.saveSoon();
   }

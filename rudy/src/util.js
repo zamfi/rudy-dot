@@ -43,11 +43,7 @@ function flattenNode(node, depth=0) {
     try {
       return ""+node;
     } catch (e) {
-      if (e instanceof TypeError) {
-        return "(too deep)";
-      } else {
-        throw e;
-      }
+      return "?";
     }
   }
   if (typeof node !== 'object' || node === null) {
