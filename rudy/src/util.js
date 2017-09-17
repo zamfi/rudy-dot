@@ -71,4 +71,8 @@ function flattenStack(stack) {
   });
 }
 
-export {debounce, queryString, extra, flattenNode, flattenStack};
+function hideBadEntities(str) {
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export {debounce, queryString, extra, flattenNode, flattenStack, hideBadEntities};

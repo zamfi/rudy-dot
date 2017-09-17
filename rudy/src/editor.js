@@ -8,7 +8,7 @@ import 'codemirror/addon/lint/javascript-lint';
 import 'codemirror/addon/comment/comment';
 import 'codemirror/lib/codemirror.css'
 import { JSHINT } from 'jshint';
-import { debounce, extra } from './util';
+import { debounce, extra, hideBadEntities } from './util';
 
 import './editor.css'
 
@@ -254,9 +254,9 @@ class Scope {
         return `{${Object.keys(v.properties).map(k => k+": "+Scope.stringValue(v.properties[k], strong, depth+1)).join(', ')}}`;
       }
     } else if (typeof(v) === 'string'){
-      return strong ? `"<strong>${v}</strong>"` : `"${v}"`;
+      return strong ? `"<strong>${hideBadEntities(v)}</strong>"` : `"${hideBadEntities(v)}"`;
     } else {
-      return strong ? `<strong>${String(v)}</strong>` : String(v);
+      return strong ? `<strong>${hideBadEntities(String(v))}</strong>` : hideBadEntities(String(v));
     }
   }
   
