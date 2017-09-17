@@ -280,7 +280,7 @@ class Rudy extends Component {
       controllerState: 'running',
       latestCode: this._editor.currentCode()
     }, () => {
-      console.log("running with runner", this.codeRunner, "!");
+      // console.log("running with runner", this.codeRunner, "!");
       this.codeRunner.run((success) => {
         if (success === true) {
           this.setState({ everSolved: true });
