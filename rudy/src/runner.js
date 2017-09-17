@@ -481,7 +481,7 @@ class ExpressionDemonstrator {
   }
 }
 
-class RudyRunner {
+class SessionRunner {
   constructor(code, level, evaluationDelay, randomSeed, eventHandler, drawIntoElement) {
     // console.log("session running drawing into", drawIntoElement);
     this.randomSeed = randomSeed;
@@ -490,13 +490,10 @@ class RudyRunner {
     this.startLevel = level;
     this.eventHandler = eventHandler;
 
-    this.allHues = {
-      "red": {r: 255, g: 220, b: 220},
-      "blue": {r: 150, g: 200, b: 255},
-      "green": {r: 200, g: 255, b: 200},
-      "yellow": {r: 255, g: 255, b: 200},
-      false: {r: 255, g: 255, b: 255}
-    };
+    if (this.preInit) {
+      this.preInit();
+    }
+
     this.p5 = new p5((sketch) => this.p5init(sketch), drawIntoElement || document.createElement('div'), false); // use existing element, or fake one.
 
     this.interpreter = new Interpreter(code, (interpreter, scope) => this.postScopeInit(interpreter, scope))
@@ -622,7 +619,29 @@ class RudyRunner {
     nativeFunction.__name = name;
     return nativeFunction;
   }
-  
+
+  passEvent(name, arg1, arg2, etc) {
+    let eventHandler = this.eventHandler;
+    let realArgs = Array.prototype.slice.call(arguments, 1);
+    if (eventHandler && eventHandler[name+"Handler"]) {
+      eventHandler[name+"Handler"].apply(eventHandler, realArgs);
+    } else {
+      // console.log("no handler for event", name, realArgs);
+    }
+  }
+}
+
+class RudyRunner extends SessionRunner {
+  preInit() {
+    this.allHues = {
+      "red": {r: 255, g: 220, b: 220},
+      "blue": {r: 150, g: 200, b: 255},
+      "green": {r: 200, g: 255, b: 200},
+      "yellow": {r: 255, g: 255, b: 200},
+      false: {r: 255, g: 255, b: 255}
+    };
+  }
+
   postScopeInit(interpreter, scope) {
     let logFunction = this.parentElement ? console.log.bind(console) : function() {};
     interpreter.setProperty(scope, 'log', this.createNamedNativeFunction(interpreter, logFunction, 'log'));
@@ -634,15 +653,6 @@ class RudyRunner {
     );
   }
   
-  passEvent(name, arg1, arg2, etc) {
-    let eventHandler = this.eventHandler;
-    let realArgs = Array.prototype.slice.call(arguments, 1);
-    if (eventHandler && eventHandler[name+"Handler"]) {
-      eventHandler[name+"Handler"].apply(eventHandler, realArgs);
-    } else {
-      // console.log("no handler for event", name, realArgs);
-    }
-  }
 
   getColor() {
     if (! this.level.colors) { return false; }
