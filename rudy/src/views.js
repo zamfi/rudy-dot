@@ -65,7 +65,7 @@ class ExpressionDemonstrator {
     return last;
   }
 
-  subRender(startIndex, endIndex) {
+  subRender(startIndex, endIndex, startNode=null) {
     // console.log("subrender", startIndex, endIndex, this.rootFrameIndex);
     if (endIndex < this.rootFrameIndex) {
       let frame = this.frameAt(endIndex);
@@ -100,9 +100,9 @@ class ExpressionDemonstrator {
       if (frame.doneLeft_ && frame.doneRight_) {
         result = Scope.stringValue('leftValue_' in frame ? frame.leftValue_ : (frame.node.operator === '&&' ? true : false), false) + 
           this.code.slice(frame.node.left.end, frame.node.right.start) + 
-          (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false));
+          (nextFrame ? this.subRender(startIndex+1, endIndex, frame.node.right) : Scope.stringValue(frame.value, false));
       } else if (frame.doneLeft_) {
-        result = (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false)) + this.code.slice(frame.node.left.end, frame.node.right.end);
+        result = (nextFrame ? this.subRender(startIndex+1, endIndex, frame.node.left) : Scope.stringValue(frame.value, false)) + this.code.slice(frame.node.left.end, frame.node.right.end);
       } else {
         return this.code.slice(frame.node.start, frame.node.end);
       }
@@ -110,7 +110,7 @@ class ExpressionDemonstrator {
     case 'UnaryExpression':
       let opString = this.code.slice(frame.node.start, frame.node.argument.start);
       if (nextFrame) {
-        return opString + this.subRender(startIndex+1, endIndex);
+        return opString + this.subRender(startIndex+1, endIndex, frame.node.argument);
       } else {
         if ('value' in frame) {
           return opString + Scope.stringValue(frame.value, false);
@@ -123,14 +123,18 @@ class ExpressionDemonstrator {
         return this.code.slice(frame.node.start, frame.node.end);
       } else if (nextFrame) {
         return this.code.slice(frame.node.start, frame.node.argument.start) +
-          this.subRender(startIndex+1, endIndex) + 
+          this.subRender(startIndex+1, endIndex, frame.node.argument) + 
           this.code.slice(frame.node.argument.end, frame.node.end);
       } else {
         return Scope.stringValue('leftValue_' in frame ? frame.leftValue_ : frame.value, false);
       }
     case 'CallExpression':
-      if (! nextFrame && frame.doneExec_ && extra(frame).checkedFunction) {
+      if (! nextFrame && frame.doneExec_ && extra(frame).checkedFunction && extra(frame).allArgsShown) {
         return Scope.stringValue(frame.value, false);
+      }
+      if (! frame.node.callee) {
+        // probably a getter or something -- need to use the original identifier. :(
+        return this.code.slice(startNode.start, startNode.end);
       }
       prefix = this.code.slice(frame.node.start, frame.node.callee.start);
       var callee = this.code.slice(frame.node.callee.start, frame.node.callee.end);
@@ -146,11 +150,14 @@ class ExpressionDemonstrator {
         if (i in fullArguments) {
           return Scope.stringValue(fullArguments[i], false) + suffix;
         } else if (nextFrame && i === frame.n_-1) {
-          return this.subRender(startIndex+1, endIndex) + suffix;
+          return this.subRender(startIndex+1, endIndex, arg) + suffix;
         } else {
           return this.code.slice(arg.start, arg.end) + suffix;
         }
       });
+      if (fullArguments.length === frame.node.arguments.length) {
+        extra(frame).allArgsShown = true;
+      }
       if (args.length === 0) {
         return prefix + callee + this.code.slice(frame.node.callee.end, frame.node.end);
       } else {
@@ -170,12 +177,12 @@ class ExpressionDemonstrator {
       } else if (frame.mode_ === 1) {
         return [
           prefix,
-          (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false)),
+          (nextFrame ? this.subRender(startIndex+1, endIndex, frame.node.test) : Scope.stringValue(frame.value, false)),
           this.code.slice(frame.node.test.end, frame.node.end)
         ].join("");
       } else { // mode_ === 2
         if (nextFrame) {
-          return this.subRender(startIndex+1, endIndex);
+          return this.subRender(startIndex+1, endIndex, frame.value ? frame.node.consequent : frame.node.alternate);
         } else {
           return Scope.stringValue(frame.value, false);
         }
@@ -188,7 +195,7 @@ class ExpressionDemonstrator {
 
   render() {
     // console.log("rendering stack", flattenStack(this.stack), this.rootFrameIndex, this._latestFrame);
-    let line = this.subRender(this.rootFrameIndex, this.lastIndex());
+    let line = this.subRender(this.rootFrameIndex, this.lastIndex(), this.rootFrame.node);
     if (this.lines.length === 0) {
       if (line !== this.nodeCode && line !== 'undefined' && line !== null) {
         this.lines.push(line);

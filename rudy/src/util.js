@@ -31,11 +31,11 @@ function queryString(obj) {
   return acc.join('&');
 }
 
-function extra(frame) {
-  if (! frame.__extra) {
-    frame.__extra = {};
+function extra(elt) {
+  if (! elt.__extra) {
+    elt.__extra = {};
   }
-  return frame.__extra;
+  return elt.__extra;
 }
 
 function flattenNode(node, depth=0) {

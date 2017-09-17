@@ -8,7 +8,7 @@ import 'codemirror/addon/lint/javascript-lint';
 import 'codemirror/addon/comment/comment';
 import 'codemirror/lib/codemirror.css'
 import { JSHINT } from 'jshint';
-import { debounce } from './util';
+import { debounce, extra } from './util';
 
 import './editor.css'
 
@@ -160,17 +160,23 @@ class Editor extends Component {
 
   showGlobalVariables(frame) {
     return frame.node.declarations.map(decl => {
-      let elt = document.createElement('div')
-      elt.className = "callout"
+      if (! extra(decl).callout) {
+        let elt = document.createElement('div')
+        elt.className = "callout"
       
-      let handler = new SingleVarTracker(frame.scope, decl, elt);
-      handler.render();
+        let handler = new SingleVarTracker(frame.scope, decl, elt);
+        handler.render();
 
-      let pos = this._cm.posFromIndex(decl.init ? decl.init.start : decl.end);
-      this._cm.addWidget(pos, elt);
-      
-      return handler;
-    });
+        let pos = this._cm.posFromIndex(decl.init ? decl.init.start : decl.end);
+        this._cm.addWidget(pos, elt);
+        
+        extra(decl).callout = handler;
+        
+        return handler;
+      } else {
+        return null;
+      }
+    }).filter(h => h !== null);
   }
   
   showFrameScope(frame) {
@@ -233,15 +239,19 @@ class Scope {
     return v.nativeFunc ? (v.__name || v.nativeFunc.name) : (v.node.id ? v.node.id.name : "<em>anonymous</em>")
   }
   
-  static stringValue(v, strong=true) {
+  static stringValue(v, strong=true, depth=0) {
+    if (depth > 3) {
+      return "...";
+    }
     if (typeof(v) === 'object') {
       switch(v.class) {
       case 'Function':
         return `function <strong>${Scope.functionName(v)}</strong>`;
       case 'Array':
-        return `[${Array.from(v.properties).map(v => Scope.stringValue(v, strong)).join(', ')}]`;
+        return `[${Array.from(v.properties).map((v, i) => `<sup>#${i}</sup>`+Scope.stringValue(v, strong, depth+1)).join(', ')}]`;
       default:
-        return String(v);
+        // normal object?
+        return `{${Object.keys(v.properties).map(k => k+": "+Scope.stringValue(v.properties[k], strong, depth+1)).join(', ')}}`;
       }
     } else if (typeof(v) === 'string'){
       return strong ? `"<strong>${v}</strong>"` : `"${v}"`;

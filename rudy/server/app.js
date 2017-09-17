@@ -42,15 +42,31 @@ let savedCode = {
   rudy: {
     d: fs.readFileSync(__dirname+'/code/robot.js', 'utf8'),
     // i: codeutils.instrumentSync(fs.readFileSync('code/robot.js', 'utf8'), "rudy")
+  },
+  
+  p5: {
+    d: fs.readFileSync(__dirname+'/code/p5.js', 'utf8'),
+    // i: codeutils.instrumentSync(fs.readFileSync('code/p5.js', 'utf8'), "rudy")
   }
 };
 
 async function apiNew(req, res) {
-  const template = 'rudy';
-  
   let params = url.parse(req.url, true);
   let isCloning = 'cloneCode' in params.query;
   let oldSketchId = params.query.cloneCode;
+
+  let parsedExtra = {};
+  if (params.query.extra) {
+    try {
+      parsedExtra = JSON.parse(params.query.extra);
+    } catch (err) {
+      console.log("malformed JSON for extra", err);
+      send500(res, err);
+      return;
+    }
+  }
+
+  const template = parsedExtra.type || 'rudy';  
 
   let newDoc = {latestCode: savedCode[template].d, versions: [savedCode[template]]};
 
@@ -68,13 +84,13 @@ async function apiNew(req, res) {
       
     } catch (err) {
       console.log("Failed to clone!", err);
-      send500(res, err);        
+      send500(res, err);
+      return;
     }
   }
   try {
     if (params.query.extra) {
-      let parsedExtra = JSON.parse(params.query.extra);
-      ['level', 'executionSpeed'].forEach(function(k) {
+      ['level', 'executionSpeed', 'type'].forEach(function(k) {
         if (k in parsedExtra) {
           if (!newDoc.extra) {
             newDoc.extra = {};

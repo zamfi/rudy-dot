@@ -90,7 +90,9 @@
   padding: 2px;
   background: rgba(255, 238, 212, 0.85);
   box-shadow: 2px 4px 4px 1px #ca3;
-  
+  overflow-y: scroll;
+  overflow-x: hidden;
+  white-space: nowrap;
 }
 
 .callout .expression-list {

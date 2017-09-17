@@ -5,7 +5,7 @@ import { debounce, queryString } from './util';
 
 import Editor from './editor';
 import './rudy.css'
-import {RudyCodeRunner} from './runner'
+import {RudyCodeRunner, SketchCodeRunner, CodeRunner} from './runner'
 import StackView from './stack'
 
 
@@ -61,9 +61,12 @@ class Rudy extends Component {
   }  
   
   normalView() {
+    // console.log("normal view of type", this.state.extra.type);
+    let Toolbar = this.state.extra.type === 'p5' ? SketchToolbar : RudyToolbar;
+    
     return (
       <div className="app">
-        <RudyToolbar 
+        <Toolbar 
           runState={this.state.controllerState}
           saveState={this.state.saveState}
           executionSpeed={this.state.executionSpeed}
@@ -93,7 +96,7 @@ class Rudy extends Component {
     return (
       <div className="app">
       {this.state.loadingError
-        ? <p>Failed to load your sketch... Try a <a className="link" onClick={() => this.createNewSketch({level: 1})}>new sketch</a>?</p>
+        ? <p>Failed to load your sketch... Try a <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>new sketch</a>?</p>
         : <p>Loading your sketch...</p> }
       </div>
     )
@@ -103,7 +106,8 @@ class Rudy extends Component {
     return (
       <div className="app">
         <h1>Greetings!</h1>
-        <p>Start with a <a className="link" onClick={() => this.createNewSketch({level: 1})}>new sketch</a>.</p>
+        <p>Start at <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>level 1</a>.</p>
+        <p>Or, open a <a className="link" onClick={() => this.createNewSketch({type: 'p5'})}>playground</a>.</p>
       </div>
     );
   }
@@ -227,6 +231,7 @@ class Rudy extends Component {
   refreshFrame() {
     if (this._toolbar && this._canvasParent) {
       let codeRunner = this._toolbar.codeRunner("", 0, this._canvasParent);
+      // console.log("running with runner", codeRunner, "to refresh frame");
       codeRunner.run((done) => {
         // nothing to do here.
       }, true);
@@ -275,6 +280,7 @@ class Rudy extends Component {
       controllerState: 'running',
       latestCode: this._editor.currentCode()
     }, () => {
+      console.log("running with runner", this.codeRunner, "!");
       this.codeRunner.run((success) => {
         if (success === true) {
           this.setState({ everSolved: true });
@@ -326,31 +332,9 @@ class Rudy extends Component {
   }
 }
 
-class RudyToolbar extends Component {
-  nextLevel() {
-    // console.log("Next", this.state.clonedTo);
-    this.props.stopFn();
-    if (this.props.extra.clonedTo) {
-      this.props.loadSketch(this.props.extra.clonedTo);
-    } else {
-      this.props.cloneCurrentSketch({level: Number(this.props.extra.level) + 1});
-    }
-  }
-  
-  previousLevel() {
-    // console.log("Previous", this.state.clonedFrom);
-    this.props.stopFn();
-    if (this.props.extra.clonedFrom) {
-      this.props.loadSketch(this.props.extra.clonedFrom);
-    }
-  }
-  
-  codeRunner(code, executionDelay, canvasParent, editor, stack) {
-    return new RudyCodeRunner(code, this.props.extra.level, executionDelay, canvasParent, editor, stack);
-  }
-  
+class BaseToolbar extends Component {
   extra() {
-    return this.props.extra;
+    return Object.assign({}, this.props.extra);
   }
   
   buttons() {
@@ -366,6 +350,65 @@ class RudyToolbar extends Component {
     default:
       return [{ type: 'reset', title: "Reset", action: this.props.resetFn }];
     }
+  }
+  
+  render() {
+    let buttons = this.buttons();
+    
+    return <div className="toolbar">
+        <div className="toolbar-entry">
+          {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
+        </div>
+        <SaveWidget status={this.props.saveState} label={this.props.saveState} />
+        <div className="toolbar-entry">
+          Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} />
+        </div>
+      </div>
+  }
+  
+  codeRunner(code, executionDelay, canvasParent, editor, stack) {
+    console.error("Using base code runner?");
+    return new CodeRunner(code, executionDelay, canvasParent, editor, stack);
+  }
+}
+
+class SketchToolbar extends BaseToolbar {
+  extra() {
+    return Object.assign(super.extra(), {type: 'p5'});
+  }
+  
+  codeRunner(code, executionDelay, canvasParent, editor, stack) {
+    // console.log("sketch code runner!");
+    return new SketchCodeRunner(code, executionDelay, canvasParent, editor, stack);
+  }
+}
+
+class RudyToolbar extends BaseToolbar {
+  nextLevel() {
+    // console.log("Next", this.state.clonedTo);
+    this.props.stopFn();
+    if (this.props.extra.clonedTo) {
+      this.props.loadSketch(this.props.extra.clonedTo);
+    } else {
+      this.props.cloneCurrentSketch({type: 'rudy', level: Number(this.props.extra.level) + 1});
+    }
+  }
+  
+  previousLevel() {
+    // console.log("Previous", this.state.clonedFrom);
+    this.props.stopFn();
+    if (this.props.extra.clonedFrom) {
+      this.props.loadSketch(this.props.extra.clonedFrom);
+    }
+  }
+  
+  codeRunner(code, executionDelay, canvasParent, editor, stack) {
+    // console.log("rudy code runner");
+    return new RudyCodeRunner(code, this.props.extra.level, executionDelay, canvasParent, editor, stack);
+  }
+
+  extra() {
+    return Object.assign(super.extra(), {type: 'rudy'});
   }
 
   render() {

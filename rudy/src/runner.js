@@ -295,6 +295,12 @@ class RudyCodeRunner extends CodeRunner {
   }
 }
 
+class SketchCodeRunner extends CodeRunner {
+  newSessionRunner(code, evaluationDelay, seed, eventHandler, parentElement) {
+    return new SketchSessionRunner(code, evaluationDelay, seed, eventHandler, parentElement);
+  }
+}
+
 class SessionRunner {
   constructor(code, evaluationDelay, randomSeed, eventHandler, drawIntoElement, ...otherArgs) {
     // console.log("session running drawing into", drawIntoElement);
@@ -314,6 +320,7 @@ class SessionRunner {
     if (this.eventHandler) {
       this.interpreter.stateStack.addDelegate(this.eventHandler);
     }
+    // console.log("Session Runner built");
   }
   
   stepAndSchedule() {
@@ -408,6 +415,7 @@ class SessionRunner {
   }
   
   run(cb) {
+    // console.log('running!');
     this.completionCb = cb;
     this.stepAndSchedule();
   }
@@ -444,11 +452,47 @@ class SessionRunner {
   }
 }
 
-// class SketchRunner extends SessionRunner {
-//   postScopeInit(interpreter, scope) {
-//     Object.keys(this.p5).forEach()
-//   }
-// }
+class SketchSessionRunner extends SessionRunner {
+  postScopeInit(interpreter, scope) {
+    // console.log('setting up scope for sketch');
+    let p5 = this.p5;
+    Object.keys(p5.__proto__).filter(k => ! k.startsWith('_')).forEach(k => {
+      let value = p5[k];
+      if (typeof (value) === 'function') {
+        let wrappedFunction = function() {
+          // console.log("call to", k, "with args", arguments);
+          let result = value.call(p5, ...arguments);
+          // console.log(`${k}(${arguments}) yielded`, result);
+          return result === p5 ? undefined : result;
+        };
+        interpreter.setProperty(scope, k, this.createNamedNativeFunction(interpreter, wrappedFunction, k));
+      } else {
+        interpreter.setProperty(scope, k, ReferenceError, {
+          get: interpreter.createNativeFunction(() => {
+            let result = p5[k]
+            // console.log(`p5.${k} yielded`, result);
+            return result;
+          })
+        });
+      }
+      // console.log(`made ${k}`);
+    });
+  }
+  
+  p5init(p5) {
+    // console.log('setting up p5 for sketch', p5);
+    p5.setup = () => {
+      // console.log('running setup!', p5);
+      if (this.randomSeed) {
+        p5.randomSeed(this.randomSeed)
+      }
+      if (this.parentElement) {
+        p5.createCanvas(340, 340);
+        p5.background(238);
+      }
+    }
+  }
+}
 
 class RudySessionRunner extends SessionRunner {  
   preInit(level) {
@@ -1109,4 +1153,4 @@ class GateSet {
 }
 
 export default CodeRunner
-export {RudyCodeRunner, CodeRunner}
+export {RudyCodeRunner, CodeRunner, SketchCodeRunner}
