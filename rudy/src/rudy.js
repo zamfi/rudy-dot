@@ -5,7 +5,7 @@ import { debounce, queryString } from './util';
 
 import Editor from './editor';
 import './rudy.css'
-import CodeRunner from './runner'
+import {RudyCodeRunner} from './runner'
 import StackView from './stack'
 
 
@@ -225,7 +225,7 @@ class Rudy extends Component {
   
   refreshFrame() {
     if (this._canvasParent) {
-      let codeRunner = new CodeRunner("", this.state.currentLevel, 0, this._canvasParent)
+      let codeRunner = new RudyCodeRunner("", this.state.currentLevel, 0, this._canvasParent);
       codeRunner.run((done) => {
         // nothing to do here.
       }, true);
@@ -283,7 +283,7 @@ class Rudy extends Component {
     this._editor.disableEditing();
     this.doSave(true);
     // console.log("Creating runner with parent", this._canvasParent);
-    this.codeRunner = new CodeRunner(
+    this.codeRunner = new RudyCodeRunner(
       this._editor.currentCode(), 
       this.state.currentLevel, 
       Rudy.evaluationDelay(this.state.executionSpeed), 
