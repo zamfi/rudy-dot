@@ -11,5 +11,5 @@
 //  colorMode(HSB);                      -- start coloring with Hue, Saturation, Brightness
 //  stroke(0, 255, 255);                 -- stroke with a nice red color
 //  noFill();                            -- and don't fill
-//  rect(10, 10, width-10, height-10);   -- draw a rectangle
+//  rect(10, 10, width-20, height-20);   -- draw a rectangle
 
