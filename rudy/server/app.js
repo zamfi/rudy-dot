@@ -72,15 +72,17 @@ async function apiNew(req, res) {
     }
   }
   try {
-    ['level', 'executionSpeed'].forEach(function(k) {
-      if (k in params.query) {
-        if (!newDoc.extra) {
-          newDoc.extra = {};
+    if (params.query.extra) {
+      let parsedExtra = JSON.parse(params.query.extra);
+      ['level', 'executionSpeed'].forEach(function(k) {
+        if (k in parsedExtra) {
+          if (!newDoc.extra) {
+            newDoc.extra = {};
+          }
+          newDoc.extra[k] = parsedExtra[k];
         }
-        newDoc.extra[k] = params.query[k];
-      }
-    });
-    
+      });
+    }
     let doc = await db.in('sketches').create(newDoc);    
     
     console.log("made new doc", doc._id);

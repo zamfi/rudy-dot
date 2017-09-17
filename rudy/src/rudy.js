@@ -16,12 +16,11 @@ class Rudy extends Component {
     this.state = {
       controllerState: 'stopped',
       executionSpeed: 4,
-      currentLevel: 1,
+      type: "rudy",
+      extra: {},
       saveState: 'saved',
       clientId: ""+Math.round(Math.random()*1000000000),
       sketchId: null,
-      clonedTo: null,
-      clonedFrom: null,
       loadingError: null
     };
     
@@ -32,11 +31,11 @@ class Rudy extends Component {
       'resume',
       'step',
       'changeSpeed',
-      'nextLevel',
-      'previousLevel',
       'updateCanvasParent',
       'codeChangeHandler',
       'createNewSketch',
+      'cloneCurrentSketch',
+      'loadSketch',
       'refreshFrame'
     ].forEach(name => this[name] = this[name].bind(this))
     
@@ -75,9 +74,12 @@ class Rudy extends Component {
           resumeFn={this.resume}
           stepFn={this.step}
           changeSpeed={this.changeSpeed}
-          currentLevel={this.state.currentLevel}
-          nextLevel={this.state.clonedTo || this.state.everSolved ? this.nextLevel : false}
-          previousLevel={this.state.clonedFrom ? this.previousLevel : false}/>
+          loadSketch={this.loadSketch}
+          cloneCurrentSketch={this.cloneCurrentSketch}
+          extra={this.state.extra}
+          everSolved={this.state.everSolved}
+          ref={bar => this._toolbar = bar}
+          />
         <div className="editor-panel">
           <Editor initialCode={this.state.loadedCode} ref={(ed) => this._editor = ed} onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
@@ -91,7 +93,7 @@ class Rudy extends Component {
     return (
       <div className="app">
       {this.state.loadingError
-        ? <p>Failed to load your sketch... Try a <a className="link" onClick={this.createNewSketch}>new sketch</a>?</p>
+        ? <p>Failed to load your sketch... Try a <a className="link" onClick={() => this.createNewSketch({level: 1})}>new sketch</a>?</p>
         : <p>Loading your sketch...</p> }
       </div>
     )
@@ -101,7 +103,7 @@ class Rudy extends Component {
     return (
       <div className="app">
         <h1>Greetings!</h1>
-        <p>Start with a <a className="link" onClick={this.createNewSketch}>new sketch</a>.</p>
+        <p>Start with a <a className="link" onClick={() => this.createNewSketch({level: 1})}>new sketch</a>.</p>
       </div>
     );
   }
@@ -146,10 +148,8 @@ class Rudy extends Component {
         this.saveSoon = () => {};
         this.setState({
           sketchId: json.sketchId,
-          clonedFrom: json.extra ? json.extra.clonedFrom : null,
-          clonedTo: json.extra ? json.extra.clonedTo : null,
+          extra: json.extra,
           executionSpeed: json.extra && json.extra.executionSpeed !== undefined ? json.extra.executionSpeed : this.state.executionSpeed,
-          currentLevel: json.extra ? Number(json.extra.level) || 1 : 1,
           loadedCode: json.code,
           loadingError: null,
           everSolved: false
@@ -167,14 +167,15 @@ class Rudy extends Component {
     }
   }
   
-  createNewSketch() {
-    this.updateStateFromResponse(fetch('/api/new'));
+  createNewSketch(extra) {
+    this.updateStateFromResponse(fetch(`/api/new?${queryString({
+      extra: JSON.stringify(Object.assign({}, extra, {executionSpeed: this.state.executionSpeed})),
+    })}`));
   }
   
-  cloneCurrentSketch() {
+  cloneCurrentSketch(extra) {
     this.updateStateFromResponse(fetch(`/api/new?${queryString({
-      level: Number(this.state.currentLevel) + 1, 
-      executionSpeed: this.state.executionSpeed,
+      extra: JSON.stringify(Object.assign({}, extra, {executionSpeed: this.state.executionSpeed})),
       cloneCode: this.state.sketchId
     })}`));
   }
@@ -198,7 +199,7 @@ class Rudy extends Component {
       clientId: this.state.clientId,
       sketchId: this.state.sketchId,
       saveVersion: asVersion ? "true" : "false",
-      extra: JSON.stringify({level: this.state.currentLevel, executionSpeed: this.state.executionSpeed})
+      extra: JSON.stringify(Object.assign({}, this._toolbar.extra(), {executionSpeed: this.state.executionSpeed}))
     })}`
     try {
       let response = await fetch(new Request(url, {
@@ -224,32 +225,13 @@ class Rudy extends Component {
   }
   
   refreshFrame() {
-    if (this._canvasParent) {
-      let codeRunner = new RudyCodeRunner("", this.state.currentLevel, 0, this._canvasParent);
+    if (this._toolbar && this._canvasParent) {
+      let codeRunner = this._toolbar.codeRunner("", 0, this._canvasParent);
       codeRunner.run((done) => {
         // nothing to do here.
       }, true);
     }    
-  }
-  
-  nextLevel() {
-    // console.log("Next", this.state.clonedTo);
-    this.stop();
-    if (this.state.clonedTo) {
-      this.loadSketch(this.state.clonedTo);
-    } else {
-      this.cloneCurrentSketch();
-    }
-  }
-  
-  previousLevel() {
-    // console.log("Previous", this.state.clonedFrom);
-    this.stop();
-    if (this.state.clonedFrom) {
-      this.loadSketch(this.state.clonedFrom);
-    }
-  }
-  
+  }  
   
   updateCanvasParent(elt) {
     // console.log("updating canvas parent");
@@ -283,9 +265,8 @@ class Rudy extends Component {
     this._editor.disableEditing();
     this.doSave(true);
     // console.log("Creating runner with parent", this._canvasParent);
-    this.codeRunner = new RudyCodeRunner(
-      this._editor.currentCode(), 
-      this.state.currentLevel, 
+    this.codeRunner = this._toolbar.codeRunner(
+      this._editor.currentCode(),
       Rudy.evaluationDelay(this.state.executionSpeed), 
       this._canvasParent, 
       this._editor,
@@ -293,14 +274,14 @@ class Rudy extends Component {
     this.setState({ 
       controllerState: 'running',
       latestCode: this._editor.currentCode()
-    }, () =>
+    }, () => {
       this.codeRunner.run((success) => {
         if (success === true) {
           this.setState({ everSolved: true });
         }
         this.stop();
       })
-    );
+    });
   }
   
   stop() {
@@ -346,6 +327,32 @@ class Rudy extends Component {
 }
 
 class RudyToolbar extends Component {
+  nextLevel() {
+    // console.log("Next", this.state.clonedTo);
+    this.props.stopFn();
+    if (this.props.extra.clonedTo) {
+      this.props.loadSketch(this.props.extra.clonedTo);
+    } else {
+      this.props.cloneCurrentSketch({level: Number(this.props.extra.level) + 1});
+    }
+  }
+  
+  previousLevel() {
+    // console.log("Previous", this.state.clonedFrom);
+    this.props.stopFn();
+    if (this.props.extra.clonedFrom) {
+      this.props.loadSketch(this.props.extra.clonedFrom);
+    }
+  }
+  
+  codeRunner(code, executionDelay, canvasParent, editor, stack) {
+    return new RudyCodeRunner(code, this.props.extra.level, executionDelay, canvasParent, editor, stack);
+  }
+  
+  extra() {
+    return this.props.extra;
+  }
+  
   buttons() {
     switch (this.props.runState) {
     case 'stopped':
@@ -360,7 +367,7 @@ class RudyToolbar extends Component {
       return [{ type: 'reset', title: "Reset", action: this.props.resetFn }];
     }
   }
-    
+
   render() {
     let buttons = this.buttons();
     
@@ -373,13 +380,13 @@ class RudyToolbar extends Component {
           Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} />
         </div>
         <div className="toolbar-entry">
-          {this.props.previousLevel ? <a className="link" onClick={this.props.previousLevel}> &laquo; go back </a> : null}
+          {this.props.extra.clonedFrom ? <a className="link" onClick={() => this.previousLevel()}> &laquo; go back </a> : null}
         </div>
         <div className="toolbar-entry">
-          Level: <strong>{this.props.currentLevel}</strong>
+          Level: <strong>{this.props.extra.level}</strong>
         </div>
         <div className="toolbar-entry">
-          {this.props.nextLevel ? <button className="button advance" onClick={this.props.nextLevel}> Advance &rarr; </button> : null}
+          {this.props.extra.clonedTo || this.props.everSolved ? <button className="button advance" onClick={() => this.nextLevel()}> Advance &rarr; </button> : null}
         </div>
       </div>
   }

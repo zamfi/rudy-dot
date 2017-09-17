@@ -110,7 +110,7 @@ class CodeRunner {
         } else {
           extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
           this.runAfterStep(() => {
-            this.activeExpressionDemonstrator.pushedFrame(frame);
+            extra(frame).expressionDemonstrator.pushedFrame(frame);
           });
         }
       }
@@ -443,6 +443,12 @@ class SessionRunner {
     }
   }
 }
+
+// class SketchRunner extends SessionRunner {
+//   postScopeInit(interpreter, scope) {
+//     Object.keys(this.p5).forEach()
+//   }
+// }
 
 class RudySessionRunner extends SessionRunner {  
   preInit(level) {

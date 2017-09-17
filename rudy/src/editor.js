@@ -29,15 +29,6 @@ class Editor extends Component {
 	}
   
 	createError(severity, line, ch, message, showMessage) {
-    // console.log("LINT ERROR", severity, line, ch, message);
-    // let elt = document.createElement('div');
-    // elt.className = "callout errorbox";
-    // elt.innerHTML = `<div class="close">&times;</div>
-    //                   <span>${message}</span>
-    //                   <div class="border-notch notch"></div>
-    //                   <div class="notch"></div>`
-    // elt.getElementsByClassName('close')[0].onclick = () => elt.parentElement.removeChild(elt);
-
     let charIndicator = document.createElement('div');
     charIndicator.className = "callout error";
     charIndicator.innerHTML = `<div class="indicator"></div>`
