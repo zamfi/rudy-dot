@@ -1,5 +1,7 @@
 import Interpreter from 'js-interpreter'
 import p5 from 'p5'
+import {extra, flattenStack} from './util'
+import {Scope} from './editor'
 
 class RudyRunner {
   constructor(code, level, evaluationDelay, parentElement, editor, stackView) {
@@ -12,11 +14,73 @@ class RudyRunner {
     
     this.visibleScopes = [];
   }
-  
-  static shouldCalloutExpressionEvaluation(type) {
-    return type === "BinaryExpression" || type === "CallExpression" || type === "UnaryExpression" || type === "LogicalExpression"; // || type === "Identifier";
+    
+  //////////////////////////////
+  //
+  // Before & After Steps
+  //
+  //////////////////////////////
+  preStepHandler() {
+    if (this._beforeStepCallbacks) {
+      let cbs = Array.from(this._beforeStepCallbacks);
+      delete this._beforeStepCallbacks;
+      cbs.forEach(cb => cb());
+    }
   }
   
+  postStepHandler() {
+    if (this.activeExpressionDemonstrator) {
+      this.activeExpressionDemonstrator.stepComplete();
+    }
+    if (this.stackView) {
+      this.stackView.forceUpdate();
+    }
+
+    if (this._afterStepCallbacks) {
+      let cbs = Array.from(this._afterStepCallbacks);
+      delete this._afterStepCallbacks;
+      cbs.forEach(cb => cb());
+    }
+  }
+  
+  runAfterStep(cb) {
+    if (! this._afterStepCallbacks) {
+      this._afterStepCallbacks = [];
+    }
+    this._afterStepCallbacks.push(cb);
+  }
+  runBeforeStep(cb) {
+    if (! this._beforeStepCallbacks) {
+      this._beforeStepCallbacks = [];
+    }
+    this._beforeStepCallbacks.push(cb);
+  }
+  
+  //////////////////////////////
+  //
+  // Nodes being pushed and popped from the stack
+  //
+  //////////////////////////////
+  
+  static shouldTriggerExpressionDemonstrator(type) {
+    return type === "BinaryExpression" || 
+      type === "CallExpression" || 
+      type === "UnaryExpression" || 
+      type === "LogicalExpression" || 
+      type === "UpdateExpression" ||
+      type === "ConditionalExpression" ||
+      type === "Identifier";
+  }
+  
+  static shouldMaintainExpressionDemonstrator(type) {
+    return RudyRunner.shouldTriggerExpressionDemonstrator(type) || type === "Literal";
+  }
+  
+  static shouldPauseExpressionDemonstrator(type) {
+    return type === "BlockStatement";
+  }
+  
+
   nodeEvaluationHandler(frame, stack) {
     // frame is not yet on the stack
     if (this.editor) {
@@ -26,20 +90,22 @@ class RudyRunner {
         // show the parent scope
         this.visibleScopes.push(this.editor.showFrameScope(frame));
       }
-      if (RudyRunner.shouldCalloutExpressionEvaluation(frame.node.type)) {
-        this.runner.runAfterStep(() => {
+      if (RudyRunner.shouldTriggerExpressionDemonstrator(frame.node.type) && ! this.activeExpressionDemonstrator) {
+        this.runAfterStep(() => {
           // frame will be on the stack already
-          if (previousFrame && 
-              ! RudyRunner.shouldCalloutExpressionEvaluation(previousFrame.node.type) &&
-              ! (previousFrame.node.type === "AssignmentExpression" && frame.node === previousFrame.node.left)) {
-            this.editor.createEvaluationCallout(this.code, stack, frame);
-          }
+          let elt = this.editor.createExpressionDemonstratorCallout(frame.node.start);
+          this.activeExpressionDemonstrator = new ExpressionDemonstrator(this.code, stack, frame, elt);
+          extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
         });
-      }
-      if (frame.node.type === 'BlockStatement' && previousFrame.node.__extra && previousFrame.node.__extra.expressionView) {
-        this.runner.runBeforeStep(() => {
-          this.editor.removeEvaluationCallout(previousFrame.node.__extra.expressionView);
-        });
+      } else if (this.activeExpressionDemonstrator) {
+        if (RudyRunner.shouldPauseExpressionDemonstrator(frame.node.type)) {
+          delete this.activeExpressionDemonstrator;
+        } else {
+          extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
+          this.runAfterStep(() => {
+            this.activeExpressionDemonstrator.pushedFrame(frame);
+          });
+        }
       }
     }
     if (this.stackView) {
@@ -62,6 +128,29 @@ class RudyRunner {
         // global variable -- add a viewer for just this/these variable(s)!
         this.visibleScopes.push(...this.editor.showGlobalVariables(frame));
       }
+      if (this.activeExpressionDemonstrator) {
+        let demonstrator = this.activeExpressionDemonstrator;
+        if (frame === demonstrator.rootFrame) {
+          delete this.activeExpressionDemonstrator;
+        }
+        this.runAfterStep(() => {
+          demonstrator.poppedFrame(frame);
+          if (frame === demonstrator.rootFrame) {
+            // we're done. after the next step completes, update it. after that, remove it.
+            demonstrator.stepComplete();
+            this.runAfterStep(() => { // XXX: ugh. how many steps should it really wait for???
+              this.runAfterStep(() => {
+                demonstrator.remove();
+                // console.log("demonstrator removed");
+              });
+            });
+          }
+        });
+      }
+      if (! this.activeExpressionDemonstrator && extra(previousFrame).expressionDemonstrator) {
+        // console.log("recalling demonstrator", extra(previousFrame).expressionDemonstrator);
+        this.activeExpressionDemonstrator = extra(previousFrame).expressionDemonstrator;
+      }
       // this.runner.runAfterStep(() => {
       //   // frame won't be on the stack anymore
       //   if (RudyRunner.shouldCalloutExpressionEvaluation(frame.node.type) || frame.node.type === "Literal" || (frame.node.__extra && frame.node.__extra.expressionView)) {
@@ -69,16 +158,23 @@ class RudyRunner {
       //   }
       //   console.log('popped!', frame);
       // });
-      if (frame.node.__extra && frame.node.__extra.expressionView ) {
-        this.runner.runBeforeStep(() => {
-          this.editor.removeEvaluationCallout(frame.node.__extra.expressionView);
-        });
-      }
+      // if (frame.node.__extra && frame.node.__extra.expressionView ) {
+      //   this.runner.runBeforeStep(() => {
+      //     this.editor.removeEvaluationCallout(frame.node.__extra.expressionView);
+      //   });
+      // }
     }
     if (this.stackView) {
       this.stackView.removeNode(frame);
     }
   }
+  
+  //////////////////////////////
+  //
+  // Other event handlers
+  //
+  //////////////////////////////
+  
   
   runtimeErrorHandler(err, frame, stack) {
     if (this.editor) {
@@ -88,6 +184,29 @@ class RudyRunner {
       this.editor.createError("error", pos.line-1, pos.ch, `Runtime error: ${err.getMessage ? err.getMessage() : String(err)}`, true)
     }
   }
+  
+  stopHandler(interpreter) {
+    let stack = interpreter.stateStack;
+    stack.forEach(frame => {
+      if (frame.node && frame.node.__extra && frame.node.__extra.marks) {
+        frame.node.__extra.marks.forEach(m => m.clear());
+      }
+    });
+    if (this.editor) {
+      this.editor.clearFrameScopes();
+      this.editor.clearExpressionDemonstrators();
+    }
+    if (this.stackView) {
+      this.stackView.clear();
+    }
+  }
+  
+  //////////////////////////////
+  //
+  // Handling Execution
+  //
+  //////////////////////////////
+  
   
   async prerunSamples() {
     let deadline = Date.now() + 750; // 3/4 of a second from now...
@@ -134,7 +253,7 @@ class RudyRunner {
     while(this.parentElement.lastChild) {
       this.parentElement.removeChild(this.parentElement.lastChild);
     }
-    this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.editor, this.parentElement, this.stackView);
+    this.runner = new SessionRunner(this.code, this.level, this.evaluationDelay, seed, this, this.parentElement);
     this.runner.run(doneCb);
 
     // XXX This is caused by a bug that only shows up in Safari where the canvas isn't made visible...
@@ -161,22 +280,6 @@ class RudyRunner {
     this.runner.stop();
   }
   
-  stopHandler(interpreter) {
-    let stack = interpreter.stateStack;
-    stack.forEach(frame => {
-      if (frame.node && frame.node.__extra && frame.node.__extra.marks) {
-        frame.node.__extra.marks.forEach(m => m.clear());
-      }
-    });
-    if (this.editor) {
-      this.editor.clearFrameScopes();
-      this.editor.clearEvaluations();
-    }
-    if (this.stackView) {
-      this.stackView.clear();
-    }
-  }
-  
   setEvaluationDelay(delay) {
     this.evaluationDelay = delay;
     if (this.runner) {
@@ -185,16 +288,212 @@ class RudyRunner {
   }
 }
 
+class ExpressionDemonstrator {
+  constructor(code, stack, frame, elt) {
+    this.code = code;
+    this.stack = stack;
+
+    this.rootFrameIndex = stack.length-1;
+    this.rootFrame = frame;
+  
+    this.nodeCode = code.slice(frame.node.start, frame.node.end);
+
+    this.lines = [];
+  
+    this.elt = elt;
+  }
+
+  pushedFrame(frame) {
+    // console.log("pushed", frame);
+    this.update();
+  }
+  
+  poppedFrame(frame) {
+    // console.log("popped", frame);
+    this._latestFrame = frame;
+    this.update();
+    delete this._latestFrame;
+  }
+  
+  stepComplete() {
+    // console.log("stepped", this.stack.top());
+    this.update();
+  }
+
+  update() {
+    // try {
+      this.elt.innerHTML = this.render();
+    // } catch (e) {
+      // debugger;
+    // }
+  }
+
+  remove() {
+    // console.log("removing demonstrator for", this.code.slice(this.rootFrame.node.start, this.rootFrame.node.end));
+    this.elt.remove();
+  }
+
+  frameAt(index) {
+    if (index < this.stack.length) {
+      return this.stack[index];
+    } else {
+      return undefined;
+    }
+  }
+  lastIndex() {
+    let topFrameIndex = this.stack.length-1;
+    if (topFrameIndex < this.rootFrameIndex) {
+      return topFrameIndex;
+    }
+    let last = this.rootFrameIndex;
+    while (last < topFrameIndex && 'expressionDemonstrator' in extra(this.frameAt(last))) {
+      last++;
+    }
+    return last;
+  }
+
+  subRender(startIndex, endIndex) {
+    // console.log("subrender", startIndex, endIndex, this.rootFrameIndex);
+    if (endIndex < this.rootFrameIndex) {
+      let frame = this.frameAt(endIndex);
+      if (frame) {
+        let strVal = Scope.stringValue(frame.value, false);
+        return strVal;
+      }
+      return;
+    }
+    let frame = this.frameAt(startIndex);
+    let nextFrame = startIndex < endIndex ? this.frameAt(startIndex+1) : null;
+
+    var result;
+    var prefix;
+    var suffix;
+
+    switch (frame.node.type) {
+    case 'Literal':
+      return Scope.stringValue(frame.node.value, false);
+    case 'Identifier':
+      return frame.node.name; // XXX: might need something more complex here.
+
+    // [doneLeft_:leftValue_,doneRight_]:value & nextFrame
+    // [,] ; [true,] & left ; [true,]:lv ; [true:lv,true]:lv & right ; [true:lv,true]:rv ; popped(up one frame gets .value)
+    case 'LogicalExpression':
+    case 'BinaryExpression':
+      prefix = this.code.slice(frame.node.start, frame.node.left.start);
+      suffix = this.code.slice(frame.node.right.end, frame.node.end);
+      if (frame.doneLeft_ && frame.doneRight_) {
+        result = Scope.stringValue('leftValue_' in frame ? frame.leftValue_ : (frame.node.operator === '&&' ? true : false), false) + 
+          this.code.slice(frame.node.left.end, frame.node.right.start) + 
+          (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false));
+      } else if (frame.doneLeft_) {
+        result = (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false)) + this.code.slice(frame.node.left.end, frame.node.right.end);
+      } else {
+        return this.code.slice(frame.node.start, frame.node.end);
+      }
+      return prefix + result + suffix;
+    case 'UnaryExpression':
+      let opString = this.code.slice(frame.node.start, frame.node.argument.start);
+      if (nextFrame) {
+        return opString + this.subRender(startIndex+1, endIndex);
+      } else {
+        if ('value' in frame) {
+          return opString + Scope.stringValue(frame.value, false);
+        } else {
+          return this.code.slice(frame.node.start, frame.node.end);
+        }
+      }
+    case 'UpdateExpression':
+      if (! nextFrame && ! ('leftValue_' in frame) && (! ('value' in frame) || frame.value instanceof Array)) {
+        return this.code.slice(frame.node.start, frame.node.end);
+      } else if (nextFrame) {
+        return this.code.slice(frame.node.start, frame.node.argument.start) +
+          this.subRender(startIndex+1, endIndex) + 
+          this.code.slice(frame.node.argument.end, frame.node.end);
+      } else {
+        return Scope.stringValue('leftValue_' in frame ? frame.leftValue_ : frame.value, false);
+      }
+    case 'CallExpression':
+      if (! nextFrame && frame.doneExec_ && extra(frame).checkedFunction) {
+        return Scope.stringValue(frame.value, false);
+      }
+      prefix = this.code.slice(frame.node.start, frame.node.callee.start);
+      var callee = this.code.slice(frame.node.callee.start, frame.node.callee.end);
+      if ('func_' in frame) {
+        extra(frame).checkedFunction = true;
+        if (Scope.functionName(frame.func_) !== callee) {
+          callee = Scope.functionName(frame.func_);
+        }
+      }
+      let fullArguments = frame.arguments_ && ! (frame.value instanceof Array) && frame.arguments_.length < frame.n_-(nextFrame?1:0) ? frame.arguments_.concat(frame.value) : frame.arguments_ || [];
+      let args = frame.node.arguments.map((arg, i, args) => {
+        let suffix = i < args.length-1 ? this.code.slice(arg.end, args[i+1].start) : "";
+        if (i in fullArguments) {
+          return Scope.stringValue(fullArguments[i], false) + suffix;
+        } else if (nextFrame && i === frame.n_-1) {
+          return this.subRender(startIndex+1, endIndex) + suffix;
+        } else {
+          return this.code.slice(arg.start, arg.end) + suffix;
+        }
+      });
+      if (args.length === 0) {
+        return prefix + callee + this.code.slice(frame.node.callee.end, frame.node.end);
+      } else {
+        return [
+          prefix,
+          callee,
+          this.code.slice(frame.node.callee.end, frame.node.arguments[0].start),
+          args.join(""),
+          this.code.slice(frame.node.arguments[frame.node.arguments.length-1].end, frame.node.end)
+        ].join("");
+      }
+    case 'ConditionalExpression':
+      prefix = this.code.slice(frame.node.start, frame.node.test.start);
+      suffix = this.code.slice(frame.node.alternate.end, frame.node.end);
+      if (frame.mode_ === 0) {
+        return this.code.slice(frame.node.start, frame.node.end);
+      } else if (frame.mode_ === 1) {
+        return [
+          prefix,
+          (nextFrame ? this.subRender(startIndex+1, endIndex) : Scope.stringValue(frame.value, false)),
+          this.code.slice(frame.node.test.end, frame.node.end)
+        ].join("");
+      } else { // mode_ === 2
+        if (nextFrame) {
+          return this.subRender(startIndex+1, endIndex);
+        } else {
+          return Scope.stringValue(frame.value, false);
+        }
+      }
+    default:
+      return;
+      // return Scope.stringValue(frame.value, true);
+    }
+  }
+
+  render() {
+    // console.log("rendering stack", flattenStack(this.stack), this.rootFrameIndex, this._latestFrame);
+    let line = this.subRender(this.rootFrameIndex, this.lastIndex());
+    if (this.lines.length === 0) {
+      if (line !== this.nodeCode && line !== 'undefined' && line !== null) {
+        this.lines.push(line);
+      }
+    } else if (line !== null && line !== 'undefined' && this.lines[this.lines.length-1] !== line) {
+      this.lines.push(line);
+    }
+    let result = this.lines.length === 0 ? "" : `<div class="expression-list"><div class="node-code">${this.nodeCode}</div>${this.lines.map(line => `<div class="expression">${line}</div>`).join("")}</div>`;
+    // console.log("got from render", this.lines, result);
+    return result;
+  }
+}
+
 class SessionRunner {
-  constructor(code, level, evaluationDelay, randomSeed, eventHandler, editor, drawIntoElement, stackView) {
+  constructor(code, level, evaluationDelay, randomSeed, eventHandler, drawIntoElement) {
     // console.log("session running drawing into", drawIntoElement);
     this.randomSeed = randomSeed;
     this.parentElement = drawIntoElement;
     this.evaluationDelay = evaluationDelay;
     this.startLevel = level;
     this.eventHandler = eventHandler;
-    this.editor = editor;
-    this.stackView = stackView;
 
     this.allHues = {
       "red": {r: 255, g: 220, b: 220},
@@ -203,7 +502,7 @@ class SessionRunner {
       "yellow": {r: 255, g: 255, b: 200},
       false: {r: 255, g: 255, b: 255}
     };
-    this.p5 = new p5((sketch) => this.p5init(sketch), drawIntoElement || document.createElement('div'), true); // use existing element, or fake one.
+    this.p5 = new p5((sketch) => this.p5init(sketch), drawIntoElement || document.createElement('div'), false); // use existing element, or fake one.
 
     this.interpreter = new Interpreter(code, (interpreter, scope) => this.postScopeInit(interpreter, scope))
     
@@ -256,19 +555,6 @@ class SessionRunner {
     }
   }
   
-  runAfterStep(cb) {
-    if (! this._afterStepCallbacks) {
-      this._afterStepCallbacks = [];
-    }
-    this._afterStepCallbacks.push(cb);
-  }
-  runBeforeStep(cb) {
-    if (! this._beforeStepCallbacks) {
-      this._beforeStepCallbacks = [];
-    }
-    this._beforeStepCallbacks.push(cb);
-  }
-  
   pause() {
     this.isPaused = true;
   }
@@ -279,23 +565,11 @@ class SessionRunner {
   }
   
   _preStep() {
-    if (this._beforeStepCallbacks) {
-      this._beforeStepCallbacks.forEach(cb => cb());
-      delete this._beforeStepCallbacks;
-    }
+    this.passEvent("preStep", this.interpreter);
   }
   
   _postStep() {
-    if (this._afterStepCallbacks) {
-      this._afterStepCallbacks.forEach(cb => cb());
-      delete this._afterStepCallbacks;
-    }
-    if (this.editor && this.editor.hasActiveEvaluationCallouts()) {
-      this.editor.updateEvaluationCallout(this.interpreter.stateStack, this.interpreter.stateStack.top());
-    }
-    if (this.stackView) {
-      this.stackView.forceUpdate();
-    }
+    this.passEvent("postStep", this.interpreter);
   }
   
   step() {
