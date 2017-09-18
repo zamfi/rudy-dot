@@ -176,7 +176,7 @@ class ExpressionDemonstrator {
     case 'ConditionalExpression':
       prefix = this.codeAt(frame.node.start, frame.node.test.start);
       suffix = this.codeAt(frame.node.alternate.end, frame.node.end);
-      if (frame.mode_ === 0) {
+      if (frame.mode_ === 0 || ! ('mode_' in frame)) {
         return this.codeAt(frame.node.start, frame.node.end);
       } else if (frame.mode_ === 1) {
         return [
