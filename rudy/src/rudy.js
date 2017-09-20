@@ -84,7 +84,11 @@ class Rudy extends Component {
           ref={bar => this._toolbar = bar}
           />
         <div className="editor-panel">
-          <Editor initialCode={this.state.loadedCode} ref={(ed) => this._editor = ed} onChange={this.codeChangeHandler}/>
+          <Editor 
+            initialCode={this.state.loadedCode} 
+            theme={this.state.extra.type === 'p5' ? 'playground' : 'default'}
+            ref={(ed) => this._editor = ed} 
+            onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
           <RudySidebar updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
         </div>

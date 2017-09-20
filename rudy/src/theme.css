@@ -1,0 +1,128 @@
+/*// brown: #6C4D13
+// black: #333
+// blue: #0F9DD7
+// pink: #D9328F
+// gray: #999999
+// dark blue: #318094
+// white: #fdfdfd
+
+//numbers
+//light gray: #f4f4f4
+//dark gray: #b5b5b5
+*/
+/*$p5-light-lightbrown: #A67F59;
+$p5-light-brown: #704F21;
+#333333: #333333;
+#D9328F: #D9328F;
+#A0A0A0: #A0A0A0;
+#00A1D3: #00A1D3;
+#2D7BB6: #2D7BB6;
+#FDFDFD: #FDFDFD;
+#EE9900: #EE9900;
+#E0D7D1: #E0D7D1;
+#666666: #666666;
+#58A10B: #58a10b;
+
+#f4f4f4: #f4f4f4;
+#b5b5b5: #b5b5b5;
+rgba(45, 123, 182, 25): rgba(45, 123, 182, 25);
+rgb(207, 207, 207): rgb(207, 207, 207);
+*/
+.cm-s-playground {
+  background-color: #FDFDFD;
+  color: #333333;
+}
+
+.cm-s-playground .cm-comment {
+  color: #A0A0A0;
+}
+
+.cm-s-playground .cm-def {
+  color: #00A1D3;
+}
+
+.cm-s-playground .cm-string {
+  color: #58A10B;
+}
+
+.cm-s-playground .cm-string-2 {
+  color: #EE9900;
+}
+
+.cm-s-playground .cm-number {
+  color: #333333;
+}
+
+.cm-s-playground .cm-keyword {
+  color: #704F21;
+}
+
+.cm-s-playground .cm-variable {
+  color: #00A1D3;
+}
+
+.cm-s-playground .cm-variable2 {
+  color: #333333;
+}
+
+.cm-s-playground .cm-property {
+  color: #333333;
+}
+
+.cm-s-playground .cm-atom {
+  color: #D9328F;
+}
+
+.cm-s-playground .cm-operator {
+  color: #A67F59;
+}
+
+.cm-s-playground .cm-linenumber {
+  color: #b5b5b5;
+}
+
+.cm-s-playground .CodeMirror-selected {
+  background-color: rgba(45, 123, 182, 25);
+}
+
+.cm-s-playground .CodeMirror-activeline-background {
+  background-color: #F3F3F3;
+}
+
+.cm-s-playground .CodeMirror-activeline-gutter {
+  background-color: #ECECEC;
+}
+
+.cm-s-playground .cm-error {
+  color: #f00;
+}
+
+.cm-s-playground .CodeMirror-matchingbracket {
+  outline: 1px solid #b5b5b5;
+  color: black !important;
+}
+
+.cm-s-playground .cm-qualifier {
+  color: #00A1D3;
+}
+
+.cm-s-playground .cm-tag {
+  color: #D9328F;
+}
+
+.cm-s-playground .cm-builtin {
+  color: #00A1D3;
+}
+
+.cm-s-playground .cm-attribute {
+  color: #333333;
+}
+
+.cm-s-playground .cm-p5-function {
+  color: #2D7BB6;
+/*  font-weight: bold;*/
+}
+
+.cm-s-playground .cm-p5-variable {
+  color: #D9328F;
+}

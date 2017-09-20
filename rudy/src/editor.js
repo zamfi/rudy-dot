@@ -11,6 +11,8 @@ import { JSHINT } from 'jshint';
 import { debounce, extra, hideBadEntities } from './util';
 
 import './editor.css'
+import './theme.css'
+import './p5-javascript'
 
 
 window.JSHINT = JSHINT
@@ -67,7 +69,7 @@ class Editor extends Component {
 	
 	componentDidMount() {
     this._cm = CodeMirror(this.cmContainer, { // eslint-disable-line
-      // theme: `p5-${this.props.theme}`,
+      theme: `${this.props.theme}`,
 			mode: "javascript",
       value: this.props.initialCode,
 			tabSize: 2,
