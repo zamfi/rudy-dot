@@ -453,17 +453,85 @@ class SessionRunner {
 }
 
 class SketchSessionRunner extends SessionRunner {
+  nativeToPseudo(interpreter, nativeObj, depth = 0) {
+    if (depth > 30) {
+      debugger;
+    }
+    if (typeof nativeObj === 'boolean' ||
+        typeof nativeObj === 'number' ||
+        typeof nativeObj === 'string' ||
+        nativeObj === null || nativeObj === undefined) {
+      return nativeObj;
+    }
+
+    if (nativeObj instanceof RegExp) {
+      var pseudoRegexp = interpreter.createObjectProto(interpreter.REGEXP_PROTO);
+      interpreter.populateRegExp(pseudoRegexp, nativeObj);
+      return pseudoRegexp;
+    }
+
+    if (nativeObj instanceof Function) {
+      let self = this;
+      var wrapper = function() {
+        return self.nativeToPseudo(interpreter,
+          nativeObj.apply(interpreter,
+            Array.prototype.slice.call(arguments)
+            .map(function(i) {
+              return interpreter.pseudoToNative(i);
+            })
+          ),
+          depth+1
+        );
+      };
+      return interpreter.createNativeFunction(wrapper, undefined);
+    }
+
+    var pseudoObj;
+    if (Array.isArray(nativeObj)) {  // Array.
+      pseudoObj = interpreter.createObjectProto(interpreter.ARRAY_PROTO);
+      for (var i = 0; i < nativeObj.length; i++) {
+        if (i in nativeObj) {
+          interpreter.setProperty(pseudoObj, i, ReferenceError, {
+            get: interpreter.createNativeFunction(() => {
+              return this.nativeToPseudo(interpreter, nativeObj[i], depth+1)
+            })
+          });
+        }
+      }
+    } else {  // Object.
+      pseudoObj = interpreter.createObjectProto(interpreter.OBJECT_PROTO);
+      for (var key in nativeObj) {
+        if (nativeObj[key] instanceof Function) {
+          interpreter.setProperty(
+            pseudoObj, key, this.nativeToPseudo(interpreter, nativeObj[key], depth+1));
+        } else {
+          interpreter.setProperty(pseudoObj, key, ReferenceError, {
+            get: interpreter.createNativeFunction(() => {
+              return this.nativeToPseudo(interpreter, nativeObj[key], depth+1)
+            })
+          });
+        }
+      }
+    }
+    return pseudoObj;
+  }
+  
   postScopeInit(interpreter, scope) {
     // console.log('setting up scope for sketch');
+    let logFunction = this.parentElement ? console.log.bind(console) : function() {};
+    interpreter.setProperty(scope, 'parentlog', this.createNamedNativeFunction(interpreter, logFunction, 'log'));
+    
     let p5 = this.p5;
     Object.keys(p5.__proto__).filter(k => ! k.startsWith('_')).forEach(k => {
       let value = p5[k];
       if (typeof (value) === 'function') {
+        let self = this;
         let wrappedFunction = function() {
-          // console.log("call to", k, "with args", arguments);
-          let result = value.call(p5, ...arguments);
-          // console.log(`${k}(${arguments}) yielded`, result);
-          return result === p5 ? undefined : result;
+          let args = Array.from(arguments).map(interpreter.pseudoToNative.bind(interpreter));
+          console.log("call to", k, "with args", args);
+          let result = value.call(p5, ...args);
+          console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
+          return result === p5 ? undefined : self.nativeToPseudo(interpreter, result);
         };
         interpreter.setProperty(scope, k, this.createNamedNativeFunction(interpreter, wrappedFunction, k));
       } else {
@@ -471,7 +539,7 @@ class SketchSessionRunner extends SessionRunner {
           get: interpreter.createNativeFunction(() => {
             let result = p5[k]
             // console.log(`p5.${k} yielded`, result);
-            return result;
+            return this.nativeToPseudo(interpreter, result);
           })
         });
       }

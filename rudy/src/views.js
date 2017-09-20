@@ -142,7 +142,7 @@ class ExpressionDemonstrator {
       }
       prefix = this.codeAt(frame.node.start, frame.node.callee.start);
       var callee = this.codeAt(frame.node.callee.start, frame.node.callee.end);
-      if ('func_' in frame) {
+      if ('func_' in frame && frame.func_ !== undefined) {
         extra(frame).checkedFunction = true;
         if (Scope.functionName(frame.func_) !== callee) {
           callee = Scope.functionName(frame.func_);

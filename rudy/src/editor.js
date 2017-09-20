@@ -243,7 +243,7 @@ class Scope {
     if (depth > 3) {
       return "...";
     }
-    if (typeof(v) === 'object') {
+    if (typeof(v) === 'object' && v !== null) {
       switch(v.class) {
       case 'Function':
         return `function <strong>${Scope.functionName(v)}</strong>`;
@@ -251,7 +251,12 @@ class Scope {
         return `[${Array.from(v.properties).map((v, i) => `<sup>#${i}</sup>`+Scope.stringValue(v, strong, depth+1)).join(', ')}]`;
       default:
         // normal object?
-        return `{${Object.keys(v.properties).map(k => k+": "+Scope.stringValue(v.properties[k], strong, depth+1)).join(', ')}}`;
+        let src = v.properties || v;
+        let keys = Object.keys(src);
+        if (keys.length > 20) {
+          return "{...lots...}";
+        }
+        return `{${keys.map(k => k+": "+Scope.stringValue(src[k], strong, depth+1)).join(', ')}}`;
       }
     } else if (typeof(v) === 'string'){
       return strong ? `"<strong>${hideBadEntities(v)}</strong>"` : `"${hideBadEntities(v)}"`;
