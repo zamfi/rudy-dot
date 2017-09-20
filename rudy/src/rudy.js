@@ -200,6 +200,17 @@ class Rudy extends Component {
     return undefined;
   }
   
+  noteErrors(errors) {
+    fetch(new Request(`/api/error?${queryString({
+      clientId: this.state.clientId,
+      sketchId: this.state.sketchId,
+      extra: JSON.stringify(Object.assign({}, this._toolbar.extra(), {executionSpeed: this.state.executionSpeed}))
+    })}`, {
+      method: 'POST',
+      body: JSON.stringify({code: this._editor.currentCode(), errors})
+    }));
+  }
+  
   async doSave(asVersion) {
     // console.log("Saving!");
     let code = this._editor.currentCode();
@@ -266,7 +277,8 @@ class Rudy extends Component {
           this._editor.createError(x.id, x.line-2, x.character-1, x.reason, true);
         }
       })
-      this._editor.freezeErrors();;
+      this._editor.freezeErrors();
+      this.noteErrors(annotations);
       return;
     } else {
       this._editor.clearErrors();

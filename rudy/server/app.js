@@ -229,8 +229,8 @@ async function apiRead(req, res) {
 
 async function apiError(req, res) {
   try {
-    let {code, clientId, sketchId} = url.parse(req.url, true).query
-    let errors = JSON.parse(await getRequestData(req));
+    let {clientId, sketchId} = url.parse(req.url, true).query
+    let {code, errors} = JSON.parse(await getRequestData(req));
   
     errorSave.save({
       clientId,
