@@ -140,8 +140,8 @@ class CodeRunner {
         if (frame === demonstrator.rootFrame) {
           delete this.activeExpressionDemonstrator;
         }
+        demonstrator.poppedFrame(frame); // frame is still on stack!
         this.runAfterStep(() => {
-          demonstrator.poppedFrame(frame);
           if (frame === demonstrator.rootFrame) {
             // we're done. after the next step completes, update it. after that, remove it.
             demonstrator.stepComplete();

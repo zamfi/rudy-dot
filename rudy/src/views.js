@@ -22,7 +22,7 @@ class ExpressionDemonstrator {
   }
   
   poppedFrame(frame) {
-    // console.log("popped", frame);
+    console.log("popped", frame);
     this._latestFrame = frame;
     this.update();
     delete this._latestFrame;
@@ -190,6 +190,17 @@ class ExpressionDemonstrator {
         } else {
           return Scope.stringValue(frame.value, false);
         }
+      }
+    case 'AssignmentExpression':
+      prefix = this.codeAt(frame.node.start, frame.node.right.start);
+      if (frame.doneRight_) {
+        if (nextFrame) {
+          return prefix + this.subRender(startIndex+1, endIndex, frame.node.right);
+        } else {
+          return prefix + Scope.stringValue(frame.value, false) + this.codeAt(frame.node.right.end, frame.node.end);
+        }
+      } else {
+        return this.codeAt(frame.node.start, frame.node.end);
       }
     default:
       return;
