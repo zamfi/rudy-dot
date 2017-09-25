@@ -108,10 +108,10 @@ class Rudy extends Component {
   
   freshPageView() {
     return (
-      <div className="app">
-        <h1>Greetings!</h1>
-        <p>Start at <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>level 1</a>.</p>
-        <p>Or, open a <a className="link" onClick={() => this.createNewSketch({type: 'p5'})}>playground</a>.</p>
+      <div className="app homepage">
+        <h1>Rudy the Red Dot</h1>
+        <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>Start puzzles at level 1 &raquo;</a>
+        <a className="link" onClick={() => this.createNewSketch({type: 'p5'})}>Create p5.js playground &raquo;</a>
       </div>
     );
   }

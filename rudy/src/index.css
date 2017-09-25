@@ -3,3 +3,38 @@ body {
   padding: 0;
   font-family: sans-serif;
 }
+
+.app.homepage {
+  margin-top: 50px;
+  margin-left: 100px;
+  font-family: ;
+}
+
+.app.homepage h1:before {
+  display: block;
+  content: "";
+  width: 50px;
+  height: 50px;
+  background: red;
+  border-radius: 100%;
+  margin-bottom: 20px;
+}
+
+.app.homepage a.link {
+	border-radius: 9px;
+	border: 0;
+	padding: 7px 10px;
+	color: white;
+	font-weight: 400;
+	font-size: 14px;
+	cursor: pointer;
+  background: #0080FF;
+  text-decoration: none;
+  display: inline;
+  margin: 7px 0;
+  width: 200px;
+}
+
+.app.homepage a.link + a.link {
+  background: #008000;
+}
