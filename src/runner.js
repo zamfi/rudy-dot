@@ -528,9 +528,9 @@ class SketchSessionRunner extends SessionRunner {
         let self = this;
         let wrappedFunction = function() {
           let args = Array.from(arguments).map(interpreter.pseudoToNative.bind(interpreter));
-          console.log("call to", k, "with args", args);
+          // console.log("call to", k, "with args", args);
           let result = value.call(p5, ...args);
-          console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
+          // console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
           return result === p5 ? undefined : self.nativeToPseudo(interpreter, result);
         };
         interpreter.setProperty(scope, k, this.createNamedNativeFunction(interpreter, wrappedFunction, k));

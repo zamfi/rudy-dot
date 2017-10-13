@@ -22,7 +22,7 @@ class ExpressionDemonstrator {
   }
   
   poppedFrame(frame) {
-    console.log("popped", frame);
+    // console.log("popped", frame);
     this._latestFrame = frame;
     this.update();
     delete this._latestFrame;
