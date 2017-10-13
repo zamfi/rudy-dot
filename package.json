@@ -1,21 +1,24 @@
 {
-  "name": "rudy-dot",
+  "name": "rudy",
   "version": "0.1.0",
-  "description": "A learn-to-program site!",
-  "keywords": ["programming", "learn to program", "collaborative", "javascript"],
-  "homepage": "http://program.zamfi.net",
-  "author": "J.D. Zamfirescu <zamfire@gmail.com>",
-  "main": "main.js",
+  "private": true,
   "dependencies": {
-    "connect": "~1",
-    "express": "~2",
-    "ejs": "*",
+    "codemirror": "^5.29.0",
+    "js-interpreter": "git+ssh://git@github.com/zamfi/JS-Interpreter.git",
+    "jshint": "^2.9.5",
     "mongodb": "~1.1.2",
-    "tamejs": "~0.4.9",
-    "socket.io": "~0.9.9",
-    "share": "git://github.com/zamfi/ShareJS"
+    "p5": "^0.5.14",
+    "react": "^15.6.1",
+    "react-dom": "^15.6.1",
+    "react-scripts": "1.0.12",
+    "source-map-explorer": "^1.4.0"
   },
-  "scripts": { "start": "node main.js" },
-  "engines": { "node":  "*" },
-  "private": true  
+  "scripts": {
+    "analyze": "source-map-explorer build/static/js/main.*",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  },
+  "proxy": "http://localhost:8787"
 }
