@@ -1100,6 +1100,14 @@ class RudySessionRunner extends SessionRunner {
             colors: colors
           };
         }
+        
+        function levelFreePlay() {
+          return {
+            dots: new PositionSet([ { x:9, y: 9 } ]),
+            obstacles: new PositionSet([])
+          };
+        }
+        
         return [
           levelRoundTheFence,
           levelAnObstacleCourse,
@@ -1109,9 +1117,9 @@ class RudySessionRunner extends SessionRunner {
           levelOutOfTheBox,
           levelRedsTheMark,
           levelDownUpDownUpDown,
+          levelFreePlay,
           levelGateSequence,
-          levelFollowTheColors
-          // levelFreePlay
+          levelFollowTheColors,
         ];
       })();
     }
