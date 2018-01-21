@@ -99,7 +99,7 @@ async function apiNew(req, res) {
         }
       });
     }
-    let doc = await db.in('sketches').create(newDoc);    
+    let doc = (await db.in('sketches').create(newDoc)).ops[0];
     
     console.log("made new doc", doc._id);
     

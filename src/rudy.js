@@ -260,7 +260,10 @@ class Rudy extends Component {
   }
   
   static evaluationDelay(executionSpeed) {
-    return Math.pow(2, 10-executionSpeed)
+    if (executionSpeed == 10) {
+      return 0;
+    }
+    return Math.pow(2, 10-executionSpeed);
   }
   
   run() {

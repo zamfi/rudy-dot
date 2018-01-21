@@ -49,13 +49,13 @@ exports.update = function(collectionName, id, obj, cb) {
       log("failed to update", err);
       return cb(err);
     }
-    collection.update({_id: new mongodb.ObjectID(id)}, obj, {upsert: false}, function(err, count) {
+    collection.updateOne({_id: new mongodb.ObjectID(id)}, obj, {upsert: false}, function(err, result) {
       if (err) {
         log("failed to update (2)", err);
         return cb(err);
       }
       log("saved.");
-      cb(null, count);
+      cb(null, result.modifiedCount);
     });
   })
 };
@@ -66,7 +66,7 @@ exports.create = function(collectionName, obj, cb) {
       log("failed to create", err);
       return cb(err);
     }    
-    collection.save(obj, function(err, doc) {
+    collection.insertOne(obj, function(err, doc) {
       if (err) {
         log("failed to create (2)", err);
         return cb(err);
@@ -83,7 +83,7 @@ exports.get = function(collectionName, id, cb) {
       log("failed to read", err);
       return cb(err);
     }    
-    collection.findOne({_id: new mongodb.ObjectID(id)}, function(err, doc) {
+    collection.find({_id: new mongodb.ObjectID(id)}).limit(1).next(function(err, doc) {
       if (err) {
         log("failed to read (2)", err);
         return cb(err);
@@ -100,7 +100,7 @@ exports.all = function(collectionName, cb) {
       log("failed to read", err);
       return cb(err);
     }
-    collection.find({}, {}).toArray(function(err, docs) {
+    collection.find().toArray(function(err, docs) {
       if (err) {
         cosnole.log("failed to read (2)", err);
         return cb(err);

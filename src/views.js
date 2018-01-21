@@ -144,7 +144,7 @@ class ExpressionDemonstrator {
       var callee = this.codeAt(frame.node.callee.start, frame.node.callee.end);
       if ('func_' in frame && frame.func_ !== undefined) {
         extra(frame).checkedFunction = true;
-        if (Scope.functionName(frame.func_) !== callee) {
+        if (Scope.functionName(frame.func_) !== callee && Scope.functionName(frame.func_) !== "<em>anonymous</em>") {
           callee = Scope.functionName(frame.func_);
         }
       }
@@ -202,9 +202,11 @@ class ExpressionDemonstrator {
       } else {
         return this.codeAt(frame.node.start, frame.node.end);
       }
+    case 'FunctionExpression':
+      return `function <strong>${Scope.functionName(frame)}</strong>`;
     default:
-      return;
-      // return Scope.stringValue(frame.value, true);
+      console.log("rendering unknown expression type!", frame);
+      return "???";
     }
   }
 
@@ -218,7 +220,7 @@ class ExpressionDemonstrator {
     } else if (line !== null && line !== 'undefined' && this.lines[this.lines.length-1] !== line) {
       this.lines.push(line);
     }
-    let result = this.lines.length === 0 ? "" : `<div class="expression-list"><div class="node-code">${this.nodeCode}</div>${this.lines.map(line => `<div class="expression">${line}</div>`).join("")}</div>`;
+    let result = this.lines.length === 0 ? "" : `<div class="expression-list"><div class="node-code">${this.nodeCode.split('\n')[0]}</div>${this.lines.map(line => `<div class="expression">${line}</div>`).join("")}</div>`;
     // console.log("got from render", this.lines, result);
     return result;
   }

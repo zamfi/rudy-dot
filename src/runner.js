@@ -65,22 +65,24 @@ class CodeRunner {
   //
   //////////////////////////////
   
-  static shouldTriggerExpressionDemonstrator(type) {
-    return type === "BinaryExpression" || 
+  static shouldTriggerExpressionDemonstrator(node) {
+    let type = node.type;
+    return ('start' in node) && (
+      type === "BinaryExpression" || 
       type === "CallExpression" || 
       type === "UnaryExpression" || 
       type === "LogicalExpression" || 
       type === "UpdateExpression" ||
       type === "ConditionalExpression" ||
-      type === "Identifier";
+      type === "Identifier");
   }
   
-  static shouldMaintainExpressionDemonstrator(type) {
-    return CodeRunner.shouldTriggerExpressionDemonstrator(type) || type === "Literal";
-  }
+  // static shouldMaintainExpressionDemonstrator(node) {
+  //   return CodeRunner.shouldTriggerExpressionDemonstrator(node) || node.type === "Literal";
+  // }
   
-  static shouldPauseExpressionDemonstrator(type) {
-    return type === "BlockStatement";
+  static shouldPauseExpressionDemonstrator(node) {
+    return node.type === "BlockStatement";
   }
   
 
@@ -89,19 +91,24 @@ class CodeRunner {
     if (this.editor) {
       this.editor.highlightNode(frame, stack);
       let previousFrame = stack[stack.length-1];
-      if (frame.node.type === "BlockStatement" && previousFrame.node.type === "CallExpression") {
+      if (frame.node.type === "BlockStatement" && 
+          ('start' in frame.node) && // i.e., is the block itself actually present in the code?
+          previousFrame.node.type === "CallExpression") {
+        // console.log("I think this is a call where we should check stuff", frame, previousFrame);
         // show the parent scope
         this.visibleScopes.push(this.editor.showFrameScope(frame));
       }
-      if (CodeRunner.shouldTriggerExpressionDemonstrator(frame.node.type) && ! this.activeExpressionDemonstrator) {
+      if (CodeRunner.shouldTriggerExpressionDemonstrator(frame.node) && ! this.activeExpressionDemonstrator) {
         this.runAfterStep(() => {
           // frame will be on the stack already
           let elt = this.editor.createExpressionDemonstratorCallout(frame.node.start);
           this.activeExpressionDemonstrator = new ExpressionDemonstrator(this.code, stack, frame, elt);
+          console.log("Creating demonstrator", frame, this.activeExpressionDemonstrator);
           extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
         });
       } else if (this.activeExpressionDemonstrator) {
-        if (CodeRunner.shouldPauseExpressionDemonstrator(frame.node.type)) {
+        if (CodeRunner.shouldPauseExpressionDemonstrator(frame.node)) {
+          console.log("Pausing demonstrator", frame, this.activeExpressionDemonstrator);
           let demonstrator = this.activeExpressionDemonstrator;
           this.runAfterStep(() => {
             demonstrator.stepComplete();
@@ -138,6 +145,7 @@ class CodeRunner {
       if (this.activeExpressionDemonstrator) {
         let demonstrator = this.activeExpressionDemonstrator;
         if (frame === demonstrator.rootFrame) {
+          console.log("Removing demonstrator", frame, this.activeExpressionDemonstrator);
           delete this.activeExpressionDemonstrator;
         }
         demonstrator.poppedFrame(frame); // frame is still on stack!
@@ -350,9 +358,10 @@ class SessionRunner {
             setTimeout(this.stepAndSchedule.bind(this), this.evaluationDelay);
             return;
           }
-          return this.stepAndSchedule();
+          // return this.stepAndSchedule();
+        } else {
+          return;          
         }
-        return;
       } catch (err) {
         // console.error(err);
         this.p5.noLoop();
@@ -491,9 +500,10 @@ class SketchSessionRunner extends SessionRunner {
       pseudoObj = interpreter.createObjectProto(interpreter.ARRAY_PROTO);
       for (var i = 0; i < nativeObj.length; i++) {
         if (i in nativeObj) {
-          interpreter.setProperty(pseudoObj, i, ReferenceError, {
+          let k = i;
+          interpreter.setProperty(pseudoObj, k, ReferenceError, {
             get: interpreter.createNativeFunction(() => {
-              return this.nativeToPseudo(interpreter, nativeObj[i], depth+1)
+              return this.nativeToPseudo(interpreter, nativeObj[k], depth+1)
             })
           });
         }
@@ -505,9 +515,10 @@ class SketchSessionRunner extends SessionRunner {
           interpreter.setProperty(
             pseudoObj, key, this.nativeToPseudo(interpreter, nativeObj[key], depth+1));
         } else {
-          interpreter.setProperty(pseudoObj, key, ReferenceError, {
+          let k = key;
+          interpreter.setProperty(pseudoObj, k, ReferenceError, {
             get: interpreter.createNativeFunction(() => {
-              return this.nativeToPseudo(interpreter, nativeObj[key], depth+1)
+              return this.nativeToPseudo(interpreter, nativeObj[k], depth+1)
             })
           });
         }
@@ -619,10 +630,10 @@ class RudySessionRunner extends SessionRunner {
   }
   
   createSimCommands(p5) {
-    const GRIDWIDTH=30;
-    const MARGIN=20;
-    const CELLROWS = 10;
-    const CELLCOLS = 10;
+    const GRIDWIDTH = this.level.GRIDWIDTH === undefined ? 30 : this.level.GRIDWIDTH;
+    const MARGIN    = this.level.MARGIN    === undefined ? 20 : this.level.MARGIN;
+    const CELLROWS  = this.level.CELLROWS  === undefined ? 10 : this.level.CELLROWS;
+    const CELLCOLS  = this.level.CELLCOLS  === undefined ? 10 : this.level.CELLCOLS;
 
     let setFill = (hue) => {
       var c = this.allHues[hue];
@@ -635,9 +646,9 @@ class RudySessionRunner extends SessionRunner {
       if (this.level.colors) {
         this.level.colors.forEach((c) => {
           setFill(c.hue);
-          p5.rect(MARGIN+c.x*GRIDWIDTH+1,
-                  MARGIN+c.y*GRIDWIDTH+1,
-                  GRIDWIDTH-1, GRIDWIDTH-1);
+          p5.rect(MARGIN+c.x*GRIDWIDTH,
+                  MARGIN+c.y*GRIDWIDTH,
+                  GRIDWIDTH, GRIDWIDTH);
         });
       }
     };
@@ -701,7 +712,7 @@ class RudySessionRunner extends SessionRunner {
       p5.ellipse(MARGIN+(loc.x+0.5)*GRIDWIDTH, MARGIN+(loc.y+0.5)*GRIDWIDTH, GRIDWIDTH/2, GRIDWIDTH/2);
     }
 
-    const MOVETIME = 200;
+    const MOVETIME = this.level.MOVETIME === undefined ? 200 : this.level.MOVETIME;
     let moveStart = -MOVETIME;
     var moveFinishedCb;
     var overlayText = null;
@@ -735,7 +746,7 @@ class RudySessionRunner extends SessionRunner {
           moveFinishedCb();
         }
       } else {
-        if (! this.parentElement) {
+        if (! this.parentElement || MOVETIME === 0) {
           cb();
         } else {
           setTimeout(cb, MOVETIME);
@@ -779,7 +790,7 @@ class RudySessionRunner extends SessionRunner {
     let drawCurrentPosition = () => {
       let p = this.position;
       p5.fill(238, 0, 0); // red
-      let stepFraction = Math.min(MOVETIME, p5.millis()-moveStart)/MOVETIME;
+      let stepFraction = MOVETIME === 0 ? 1 : Math.min(MOVETIME, p5.millis()-moveStart)/MOVETIME;
       if (this.nextPosition && ! this.nextPosition.failed) {
         let np = this.nextPosition;
         ellipseAtLoc({
@@ -828,7 +839,13 @@ class RudySessionRunner extends SessionRunner {
       p5.textAlign(p5.LEFT);
       p5.text("Green dots remaining: "+this.remainingDots(), 20, 10);
 
-      p5.stroke(204);
+      p5.noStroke();
+      drawColors();
+      if (this.level.strokeFn) {
+        this.level.strokeFn(p5);
+      } else {
+        p5.stroke(204);        
+      }
       for (let i = 0; i <= CELLCOLS+1; ++i) {
         p5.line(MARGIN+i*GRIDWIDTH, MARGIN, MARGIN+i*GRIDWIDTH, p5.height-MARGIN);
       }
@@ -836,7 +853,6 @@ class RudySessionRunner extends SessionRunner {
         p5.line(MARGIN, MARGIN+i*GRIDWIDTH, p5.width-MARGIN, i*GRIDWIDTH+MARGIN);
       }
       p5.noStroke();
-      drawColors();
       drawObstacles();
       drawGates();
       p5.fill(0, 238, 0); // green
@@ -874,6 +890,7 @@ class RudySessionRunner extends SessionRunner {
   }
   
   p5init(p5) {
+    this.setLevel(p5, this.startLevel);
     p5.setup = () => {
       if (this.randomSeed) {
         p5.randomSeed(this.randomSeed)
@@ -882,7 +899,6 @@ class RudySessionRunner extends SessionRunner {
         p5.createCanvas(340, 340);
         p5.background(255);
       }
-      this.setLevel(p5, this.startLevel);
     }
     p5.draw = this.createSimCommands(p5);
   }
@@ -1103,8 +1119,13 @@ class RudySessionRunner extends SessionRunner {
         
         function levelFreePlay() {
           return {
-            dots: new PositionSet([ { x:9, y: 9 } ]),
-            obstacles: new PositionSet([])
+            MOVETIME: 0,
+            GRIDWIDTH: 3,
+            CELLROWS: 100,
+            CELLCOLS: 100,
+            dots: new PositionSet([ { x:99, y: 99 } ]),
+            obstacles: new PositionSet([]),
+            strokeFn: (p5) => p5.noStroke()
           };
         }
         
