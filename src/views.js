@@ -89,6 +89,7 @@ class ExpressionDemonstrator {
     var prefix;
     var suffix;
 
+    // console.log("Rendering frame", frame.node.type, !!(nextFrame), frame);
     switch (frame.node.type) {
     case 'Literal':
       return Scope.stringValue(frame.node.value, false);
@@ -133,6 +134,7 @@ class ExpressionDemonstrator {
         return Scope.stringValue('leftValue_' in frame ? frame.leftValue_ : frame.value, false);
       }
     case 'CallExpression':
+      // console.log("CallExpression", frame);
       if (! nextFrame && frame.doneExec_ && extra(frame).checkedFunction && extra(frame).allArgsShown) {
         return Scope.stringValue(frame.value, false);
       }
@@ -147,6 +149,23 @@ class ExpressionDemonstrator {
         if (Scope.functionName(frame.func_) !== callee && Scope.functionName(frame.func_) !== "<em>anonymous</em>") {
           callee = Scope.functionName(frame.func_);
         }
+      } else if (nextFrame) {
+        callee = this.subRender(startIndex+1, endIndex, frame.node.callee);
+      } else if (frame.doneCallee_ === 1 && Array.isArray(frame.value)) {
+        let [obj, prop] = frame.value;
+        if (Scope.stringValue(obj, false) === "{}") {
+          prefix = prop;
+        } else {
+          prefix = Scope.stringValue(obj, false);
+          if (frame.node.callee.type === "MemberExpression") {
+            prefix += this.codeAt(frame.node.callee.object.end, frame.node.callee.property.start)
+            prefix += prop
+            prefix += this.codeAt(frame.node.callee.property.end, frame.node.callee.end);
+          } else {
+            return "???"
+          }
+        }
+        return prefix + this.codeAt(frame.node.callee.end, frame.node.end);
       }
       let fullArguments = frame.arguments_ && ! (frame.value instanceof Array) && frame.arguments_.length < frame.n_-(nextFrame?1:0) ? frame.arguments_.concat(frame.value) : frame.arguments_ || [];
       let args = frame.node.arguments.map((arg, i, args) => {
@@ -204,6 +223,28 @@ class ExpressionDemonstrator {
       }
     case 'FunctionExpression':
       return `function <strong>${Scope.functionName(frame)}</strong>`;
+    case 'MemberExpression':
+      if (! frame.object_) {
+        if (nextFrame) {
+          suffix = this.codeAt(frame.node.object.end, frame.node.end);
+          return this.subRender(startIndex+1, endIndex, frame.node.object) + suffix;
+        }
+      } else {
+        prefix = Scope.stringValue(frame.object_, false);
+        if (prefix === '{}') { // don't bother showing this, probably a built-in object.
+          prefix = this.codeAt(frame.node.object.start, frame.node.object.end);
+        }
+        if (frame.node.computed) {
+          return prefix + this.codeAt(frame.node.object.end, frame.node.property.start) +
+                  (nextFrame ? this.subRender(startIndex+1, endIndex, frame.node.property) 
+                             : Scope.stringValue(frame.value, false))+
+                  this.codeAt(frame.node.property.end, frame.node.end);
+        } else {
+          return prefix + this.codeAt(frame.node.object.end, frame.node.end);
+        }
+      }
+      // console.log("fallthrough");
+      return this.codeAt(frame.node.start, frame.node.end);
     default:
       console.log("rendering unknown expression type!", frame);
       return "???";

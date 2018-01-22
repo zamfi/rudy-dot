@@ -106,6 +106,10 @@
   box-shadow: 2px 3px 3px #ac3;
 }
 
+.callout .expression-list .expression {
+  white-space: nowrap;
+}
+
 .callout .expression-list .node-code {
   height: 0px;
   overflow: hidden;
