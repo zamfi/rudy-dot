@@ -159,10 +159,10 @@ class ExpressionDemonstrator {
           prefix = Scope.stringValue(obj, false);
           if (frame.node.callee.type === "MemberExpression") {
             prefix += this.codeAt(frame.node.callee.object.end, frame.node.callee.property.start)
-            prefix += prop
+            prefix += prop;
             prefix += this.codeAt(frame.node.callee.property.end, frame.node.callee.end);
           } else {
-            return "???"
+            return "???" // does this ever happen?
           }
         }
         return prefix + this.codeAt(frame.node.callee.end, frame.node.end);
