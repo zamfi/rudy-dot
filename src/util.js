@@ -75,4 +75,39 @@ function hideBadEntities(str) {
   return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export {debounce, queryString, extra, flattenNode, flattenStack, hideBadEntities};
+function printData(root, depth=0) {
+  let lpad = "  ".repeat(depth);
+  if (depth > 4) {
+    try {
+      return lpad+String(root);
+    } catch (e) {
+      return lpad+"???";
+    }
+  }
+  if (typeof root === 'function') {
+    return lpad+'function '+(root.name || "(anonymous)");
+  }
+  if (typeof root !== 'object' || root === null) {
+    return lpad+root;
+  }
+  if (root instanceof Array) {
+    return lpad+'[\n'+
+           root.map(e => printData(e, depth+1)).join('\n')+
+           '\n'+lpad+']\n';
+  }
+  return lpad+'{\n'+
+    Object.keys(root).map(k => {
+      let val = root[k];
+      if (typeof val === 'object' && val !== null) {
+        return lpad + k + ':\n' + printData(val, depth+1);
+      } else {
+        return lpad + k + ': ' + String(val);
+      }
+    }).join('\n') + '\n'+lpad+'}\n';
+}
+
+function log2alert(args) {
+  alert(Array.from(arguments).map(printData).join(' '));
+}
+
+export {debounce, queryString, extra, flattenNode, flattenStack, hideBadEntities, log2alert};

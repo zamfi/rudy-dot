@@ -260,7 +260,7 @@ class Rudy extends Component {
   }
   
   static evaluationDelay(executionSpeed) {
-    if (executionSpeed == 10) {
+    if (executionSpeed == 10) { // eslint-disable-line eqeqeq
       return 0;
     }
     return Math.pow(2, 10-executionSpeed);

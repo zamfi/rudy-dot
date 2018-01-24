@@ -237,8 +237,8 @@ class Scope {
     this.showHidden = false;
   }
   
-  static functionName(v) {
-    return v.nativeFunc ? (v.__name || v.nativeFunc.name) : (v.node.id ? v.node.id.name : "<em>anonymous</em>")
+  static functionName(v, plainText=false) {
+    return v.nativeFunc ? (v.__name || v.nativeFunc.name) : (v.node.id ? v.node.id.name : (plainText ? "anonymous" : "<em>anonymous</em>"))
   }
   
   static stringValue(v, strong=true, depth=0) {
@@ -264,6 +264,32 @@ class Scope {
       return strong ? `"<strong>${hideBadEntities(v)}</strong>"` : `"${hideBadEntities(v)}"`;
     } else {
       return strong ? `<strong>${hideBadEntities(String(v))}</strong>` : hideBadEntities(String(v));
+    }
+  }
+
+  static plainTextValue(v, depth=0) {
+    if (depth > 4) {
+      return "...";
+    }
+    if (typeof(v) === 'object' && v !== null) {
+      switch(v.class) {
+      case 'Function':
+        return `function ${Scope.functionName(v, true)}`;
+      case 'Array':
+        return `[${Array.from(v.properties).map((v, i) => Scope.plainTextValue(v, depth+1)).join(', ')}]`;
+      default:
+        // normal object?
+        let src = v.properties || v;
+        let keys = Object.keys(src);
+        if (keys.length > 20) {
+          return "{...lots...}";
+        }
+        return `{${keys.map(k => k+": "+Scope.plainTextValue(src[k], depth+1)).join(', ')}}`;
+      }
+    } else if (typeof(v) === 'string'){
+      return `"${hideBadEntities(v)}"`;
+    } else {
+      return hideBadEntities(String(v));
     }
   }
   

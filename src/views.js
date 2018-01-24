@@ -1,4 +1,4 @@
-import {extra, flattenStack, hideBadEntities} from './util'
+import {extra, hideBadEntities} from './util'
 import {Scope} from './editor'
 
 class ExpressionDemonstrator {

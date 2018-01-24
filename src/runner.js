@@ -1,6 +1,7 @@
 import Interpreter from 'js-interpreter'
 import p5 from 'p5'
 import {extra} from './util'
+import {Scope} from './editor'
 import {ExpressionDemonstrator} from './views'
 
 class CodeRunner {
@@ -103,12 +104,12 @@ class CodeRunner {
           // frame will be on the stack already
           let elt = this.editor.createExpressionDemonstratorCallout(frame.node.start);
           this.activeExpressionDemonstrator = new ExpressionDemonstrator(this.code, stack, frame, elt);
-          console.log("Creating demonstrator", frame, this.activeExpressionDemonstrator);
+          // console.log("Creating demonstrator", frame, this.activeExpressionDemonstrator);
           extra(frame).expressionDemonstrator = this.activeExpressionDemonstrator;
         });
       } else if (this.activeExpressionDemonstrator) {
         if (CodeRunner.shouldPauseExpressionDemonstrator(frame.node)) {
-          console.log("Pausing demonstrator", frame, this.activeExpressionDemonstrator);
+          // console.log("Pausing demonstrator", frame, this.activeExpressionDemonstrator);
           let demonstrator = this.activeExpressionDemonstrator;
           this.runAfterStep(() => {
             demonstrator.stepComplete();
@@ -145,7 +146,7 @@ class CodeRunner {
       if (this.activeExpressionDemonstrator) {
         let demonstrator = this.activeExpressionDemonstrator;
         if (frame === demonstrator.rootFrame) {
-          console.log("Removing demonstrator", frame, this.activeExpressionDemonstrator);
+          // console.log("Removing demonstrator", frame, this.activeExpressionDemonstrator);
           delete this.activeExpressionDemonstrator;
         }
         demonstrator.poppedFrame(frame); // frame is still on stack!
@@ -529,8 +530,12 @@ class SketchSessionRunner extends SessionRunner {
   
   postScopeInit(interpreter, scope) {
     // console.log('setting up scope for sketch');
-    let logFunction = this.parentElement ? console.log.bind(console) : function() {};
-    interpreter.setProperty(scope, 'parentlog', this.createNamedNativeFunction(interpreter, logFunction, 'log'));
+    let alertFunction = function() {
+      console.log(...Array.from(arguments));
+      alert(Array.from(arguments).map(v => Scope.plainTextValue(v)).join(" "));
+    };
+    let logFunction = this.parentElement ? alertFunction : function() { };
+    interpreter.setProperty(scope, 'alert', this.createNamedNativeFunction(interpreter, logFunction, 'alert'));
     
     let p5 = this.p5;
     Object.keys(p5.__proto__).filter(k => ! k.startsWith('_')).forEach(k => {
@@ -587,8 +592,12 @@ class RudySessionRunner extends SessionRunner {
   }
 
   postScopeInit(interpreter, scope) {
-    let logFunction = this.parentElement ? console.log.bind(console) : function() {};
-    interpreter.setProperty(scope, 'log', this.createNamedNativeFunction(interpreter, logFunction, 'log'));
+    let alertFunction = function() {
+      console.log(...Array.from(arguments));
+      alert(Array.from(arguments).map(v => Scope.plainTextValue(v)).join(" "));
+    };
+    let logFunction = this.parentElement ? alertFunction : function() {};
+    interpreter.setProperty(scope, 'alert', this.createNamedNativeFunction(interpreter, logFunction, 'alert'));
     ['getColor', 'setColor', 'remainingDots'].forEach(name => 
       interpreter.setProperty(scope, name, this.createNamedNativeFunction(interpreter, this[name].bind(this), name))
     );
