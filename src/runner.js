@@ -1,4 +1,5 @@
 import Interpreter from 'js-interpreter'
+import acorn from 'js-interpreter/acorn'
 import p5 from 'p5'
 import {extra} from './util'
 import {Scope} from './editor'
@@ -89,7 +90,7 @@ class CodeRunner {
 
   nodeEvaluationHandler(frame, stack) {
     // frame is not yet on the stack
-    if (this.editor) {
+    if (this.editor && this.editor.props.showExecution) {
       this.editor.highlightNode(frame, stack);
       let previousFrame = stack[stack.length-1];
       if (frame.node.type === "BlockStatement" && 
@@ -332,6 +333,34 @@ class SessionRunner {
     // console.log("Session Runner built");
   }
   
+  runFunction(fn, cb) {
+    // console.log("runFunction", fn);
+    this.interpreter.ast = acorn.parse(`${fn}();`, Interpreter.PARSE_OPTIONS);
+    delete this.interpreter.ast.start;
+    delete this.interpreter.ast.end;
+    delete this.interpreter.ast.body[0].start;
+    delete this.interpreter.ast.body[0].end;
+    delete this.interpreter.ast.body[0].expression.start;
+    delete this.interpreter.ast.body[0].expression.end;
+    delete this.interpreter.ast.body[0].expression.callee.start;
+    delete this.interpreter.ast.body[0].expression.callee.end;
+
+    // console.log("ast?", this.interpreter.ast);
+
+    while (this.interpreter.stateStack.length) {
+      this.interpreter.stateStack.pop();
+    }
+    var state = new Interpreter.State(this.interpreter.ast, this.interpreter.global);
+    state.done = false;
+    this.interpreter.stateStack.push(state);
+    
+    if (cb) {
+      this.completionCb = cb;      
+    }
+    this.isRunningFunction = true;
+    this.stepAndSchedule();
+  }
+  
   stepAndSchedule() {
     let repeatDeadline = Date.now() + 50; //ms
     for (;;) { // a loop that lets us continually step unless something happens.
@@ -403,12 +432,16 @@ class SessionRunner {
     this._postStep();
     
     if (! result) {
-      this.isFinished = true;
-      this.p5.noLoop();
-      this.complete();
-      this.passEvent("stop", this.interpreter);
+      this.handleNoMoreCodeToRun();
     }
     return result;
+  }
+  
+  handleNoMoreCodeToRun() {
+    this.isFinished = true;
+    this.p5.noLoop();
+    this.complete();
+    this.passEvent("stop", this.interpreter);    
   }
   
   stop() {
@@ -510,13 +543,14 @@ class SketchSessionRunner extends SessionRunner {
         }
       }
     } else {  // Object.
-      pseudoObj = interpreter.createObjectProto(interpreter.OBJECT_PROTO);
+      pseudoObj = interpreter.createObjectProto(this.nativeToPseudo(interpreter, nativeObj.__proto__, depth+1));
+      interpreter.setProperty(pseudoObj, 'constructor', this.nativeToPseudo(interpreter, nativeObj.constructor, depth+1));
       for (var key in nativeObj) {
-        if (nativeObj[key] instanceof Function) {
+        let k = key;
+        if (nativeObj[k] instanceof Function) {
           interpreter.setProperty(
-            pseudoObj, key, this.nativeToPseudo(interpreter, nativeObj[key], depth+1));
+            pseudoObj, k, this.nativeToPseudo(interpreter, nativeObj[k], depth+1));
         } else {
-          let k = key;
           interpreter.setProperty(pseudoObj, k, ReferenceError, {
             get: interpreter.createNativeFunction(() => {
               return this.nativeToPseudo(interpreter, nativeObj[k], depth+1)
@@ -525,7 +559,56 @@ class SketchSessionRunner extends SessionRunner {
         }
       }
     }
+    pseudoObj.__native = nativeObj;
     return pseudoObj;
+  }
+  
+  pseudoToNative(interpreter, pseudoObj, depth = 0) {
+    if (depth > 30) {
+      debugger;
+    }
+    // console.log("pseudo-ify", interpreter, pseudoObj, depth);
+    if (typeof pseudoObj === 'boolean' ||
+        typeof pseudoObj === 'number' ||
+        typeof pseudoObj === 'string' ||
+        pseudoObj === null || pseudoObj === undefined) {
+          // console.log("primitive type!", pseudoObj);
+      return pseudoObj;
+    }
+    
+    if (interpreter.isa(pseudoObj, interpreter.REGEXP)) {  // Regular expression.
+      return pseudoObj.data;
+    }
+    
+    if (interpreter.isa(pseudoObj, interpreter.FUNCTION)) {
+      if (pseudoObj.nativeFunc) {
+        return pseudoObj.nativeFunc;
+      } else {
+        debugger; // not supported yet.
+      }
+    }
+    
+    if (pseudoObj.__native) {
+      // console.log("pseudo to native yields native object", pseudoObj, pseudoObj.__native);
+      return pseudoObj.__native;
+    }
+    var self = this;
+    return new Proxy(pseudoObj, {
+      get: function(target, property) {
+        let ret = self.pseudoToNative(interpreter, interpreter.getProperty(target, property), depth+1);
+        console.log("get on", target, ".", property, "yields", ret);
+        return ret;
+      },
+      set: function(target, property, value) {
+        interpreter.setProperty(target, property, self.nativeToPseudo(interpreter, value, depth+1));
+      },
+      has: function(target, property) {
+        return interpreter.hasProperty(target, property);
+      },
+      ownKeys: function(target) {
+        return Object.keys(target.isObject ? target.properties : target);
+      }
+    });
   }
   
   postScopeInit(interpreter, scope) {
@@ -543,7 +626,7 @@ class SketchSessionRunner extends SessionRunner {
       if (typeof (value) === 'function') {
         let self = this;
         let wrappedFunction = function() {
-          let args = Array.from(arguments).map(interpreter.pseudoToNative.bind(interpreter));
+          let args = Array.from(arguments).map(self.pseudoToNative.bind(self, interpreter));
           // console.log("call to", k, "with args", args);
           let result = value.call(p5, ...args);
           // console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
@@ -574,6 +657,68 @@ class SketchSessionRunner extends SessionRunner {
         p5.createCanvas(340, 340);
         p5.background(238);
       }
+    }
+    
+    p5.draw = () => {
+      this.eventTriggered('draw');
+    }
+    
+    ['keyPressed', 
+     'keyReleased', 
+     'keyTyped',
+     'mouseMoved',
+     'mouseDragged',
+     'mousePressed',
+     'mouseReleased',
+     'mouseClicked',
+     'doubleClicked',
+     'mouseWheel',
+     'touchStarted',
+     'touchMoved',
+     'touchEnded'
+    ].forEach(k => p5[k] = () => this.eventTriggered(k));
+  }
+  
+  eventTriggered(eventName) {
+    // console.log("triggered", eventName);
+    if (! this.nextEvents) {
+      this.nextEvents = [];
+    }
+    if (! this.nextEvents.includes(eventName)) {
+      this.nextEvents.push(eventName);
+      // console.log("adding", eventName);
+    }
+    if (! this.isRunningFunction) {
+      this.runNextEvent();
+    }
+  }
+  
+  runNextEvent() {
+    if (this.parentElement && this.nextEvents && this.nextEvents.length > 0) {
+      let next = this.nextEvents.pop();
+      if (this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next)) {
+        console.log("will run", next);
+        this.isRunningFunction = true; 
+        setTimeout(() => this.runFunction(next), 0);
+      } else {
+        console.log("not running", next, this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next));
+      }
+    }    
+  }
+  
+  handleNoMoreCodeToRun() {
+    this.isRunningFunction = false;    
+    if (this.parentElement && this.interpreter.hasProperty(this.interpreter.global, 'setup') && ! this.hasRunSetup) {
+      this.hasRunSetup = true;
+      this.runFunction('setup')
+    } else if (this.parentElement && this.interpreter.hasProperty(this.interpreter.global, 'draw') && this.p5._loop) {
+      this.runNextEvent();
+    } else {
+      // console.log("Really done!");
+      this.isFinished = true;
+      this.p5.noLoop();
+      this.complete();
+      this.passEvent("stop", this.interpreter);
     }
   }
 }

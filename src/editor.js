@@ -253,6 +253,9 @@ class Scope {
         return `[${Array.from(v.properties).map((v, i) => `<sup>#${i}</sup>`+Scope.stringValue(v, strong, depth+1)).join(', ')}]`;
       default:
         // normal object?
+        if (v.__native && 'toString' in v.__native) {
+          return v.__native.toString();
+        }
         let src = v.properties || v;
         let keys = Object.keys(src);
         if (keys.length > 20) {
@@ -279,6 +282,9 @@ class Scope {
         return `[${Array.from(v.properties).map((v, i) => Scope.plainTextValue(v, depth+1)).join(', ')}]`;
       default:
         // normal object?
+        if (v.__native && 'name' in v.__native) {
+          return v.__native.toString();
+        }
         let src = v.properties || v;
         let keys = Object.keys(src);
         if (keys.length > 20) {

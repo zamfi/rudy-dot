@@ -16,6 +16,7 @@ class Rudy extends Component {
     this.state = {
       controllerState: 'stopped',
       executionSpeed: 4,
+      showExecution: true,
       type: "rudy",
       extra: {},
       saveState: 'saved',
@@ -31,6 +32,7 @@ class Rudy extends Component {
       'resume',
       'step',
       'changeSpeed',
+      'setShowExecution',
       'updateCanvasParent',
       'codeChangeHandler',
       'createNewSketch',
@@ -70,6 +72,7 @@ class Rudy extends Component {
           runState={this.state.controllerState}
           saveState={this.state.saveState}
           executionSpeed={this.state.executionSpeed}
+          showExecution={this.state.showExecution}
           runFn={this.run}
           stopFn={this.stop} 
           resetFn={this.reset}
@@ -77,6 +80,8 @@ class Rudy extends Component {
           resumeFn={this.resume}
           stepFn={this.step}
           changeSpeed={this.changeSpeed}
+          setShowExecution={this.setShowExecution}
+          canChangeShowExecution={this.state.controllerState === 'stopped'}
           loadSketch={this.loadSketch}
           cloneCurrentSketch={this.cloneCurrentSketch}
           extra={this.state.extra}
@@ -88,6 +93,7 @@ class Rudy extends Component {
             initialCode={this.state.loadedCode} 
             theme={this.state.extra.type === 'p5' ? 'playground' : 'default'}
             ref={(ed) => this._editor = ed} 
+            showExecution={this.state.showExecution}
             onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
           <RudySidebar updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
@@ -349,6 +355,10 @@ class Rudy extends Component {
     }
     this.saveSoon();
   }
+  
+  setShowExecution(event) {
+    this.setState({ showExecution: !! event.target.checked });
+  }
 }
 
 class BaseToolbar extends Component {
@@ -441,6 +451,11 @@ class RudyToolbar extends BaseToolbar {
         <div className="toolbar-entry">
           Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} />
         </div>
+          {/*
+        <div className="toolbar-entry">
+          <label><input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} checked={this.props.showExecution ? "checked" : null} onChange={this.props.setShowExecution} />Show Execution</label>
+        </div>
+          */}
         <div className="toolbar-entry">
           {this.props.extra.clonedFrom ? <a className="link" onClick={() => this.previousLevel()}> &laquo; go back </a> : null}
         </div>

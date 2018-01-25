@@ -140,6 +140,8 @@ class ExpressionDemonstrator {
       }
       if (! frame.node.callee) {
         // probably a getter or something -- need to use the original identifier. :(
+        // but really this breaks some member expressions that rely on native wrapper getters...
+        // those have an extra CallExprsesion that doesn't render properly.
         return this.codeAt(startNode.start, startNode.end);
       }
       prefix = this.codeAt(frame.node.start, frame.node.callee.start);
@@ -156,6 +158,7 @@ class ExpressionDemonstrator {
         if (Scope.stringValue(obj, false) === "{}") {
           prefix = prop;
         } else {
+          // console.log('f', obj);
           prefix = Scope.stringValue(obj, false);
           if (frame.node.callee.type === "MemberExpression") {
             prefix += this.codeAt(frame.node.callee.object.end, frame.node.callee.property.start)
@@ -171,10 +174,13 @@ class ExpressionDemonstrator {
       let args = frame.node.arguments.map((arg, i, args) => {
         let suffix = i < args.length-1 ? this.codeAt(arg.end, args[i+1].start) : "";
         if (i in fullArguments) {
+          // console.log('g');
           return Scope.stringValue(fullArguments[i], false) + suffix;
         } else if (nextFrame && i === frame.n_-1) {
+          // console.log('h', nextFrame, arg);
           return this.subRender(startIndex+1, endIndex, arg) + suffix;
         } else {
+          // console.log('i');
           return this.codeAt(arg.start, arg.end) + suffix;
         }
       });
@@ -182,8 +188,10 @@ class ExpressionDemonstrator {
         extra(frame).allArgsShown = true;
       }
       if (args.length === 0) {
+        // console.log('j');
         return prefix + callee + this.codeAt(frame.node.callee.end, frame.node.end);
       } else {
+        // console.log('k', args);
         return [
           prefix,
           callee,
@@ -225,25 +233,32 @@ class ExpressionDemonstrator {
       return `function <strong>${Scope.functionName(frame)}</strong>`;
     case 'MemberExpression':
       if (! frame.object_) {
+        suffix = this.codeAt(frame.node.object.end, frame.node.end);
         if (nextFrame) {
-          suffix = this.codeAt(frame.node.object.end, frame.node.end);
+          // console.log('a');
           return this.subRender(startIndex+1, endIndex, frame.node.object) + suffix;
+        } else if ('value' in frame) {
+          // console.log('b');
+          return Scope.stringValue(frame.value, false) + suffix;
         }
       } else {
         prefix = Scope.stringValue(frame.object_, false);
         if (prefix === '{}') { // don't bother showing this, probably a built-in object.
           prefix = this.codeAt(frame.node.object.start, frame.node.object.end);
         }
+        // console.log('c', prefix);
         if (frame.node.computed) {
+          // console.log('d');
           return prefix + this.codeAt(frame.node.object.end, frame.node.property.start) +
                   (nextFrame ? this.subRender(startIndex+1, endIndex, frame.node.property) 
                              : Scope.stringValue(frame.value, false))+
                   this.codeAt(frame.node.property.end, frame.node.end);
         } else {
+          // console.log('e', prefix + this.codeAt(frame.node.object.end, frame.node.end));
           return prefix + this.codeAt(frame.node.object.end, frame.node.end);
         }
       }
-      // console.log("fallthrough");
+      // console.log("fallthrough!");
       return this.codeAt(frame.node.start, frame.node.end);
     default:
       console.log("rendering unknown expression type!", frame);

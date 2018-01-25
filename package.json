@@ -8,7 +8,7 @@
     "js-interpreter": "git+ssh://git@github.com/zamfi/JS-Interpreter.git",
     "jshint": "^2.9.5",
     "mongodb": "~2.2.19",
-    "p5": "^0.5.14",
+    "p5": "^0.6.0",
     "react": "^15.6.1",
     "react-dom": "^15.6.1",
     "react-scripts": "1.0.17",
