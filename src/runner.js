@@ -680,6 +680,9 @@ class SketchSessionRunner extends SessionRunner {
   }
   
   eventTriggered(eventName) {
+    if (! this.readyForEvents) {
+      return;
+    }
     // console.log("triggered", eventName);
     if (! this.nextEvents) {
       this.nextEvents = [];
@@ -707,6 +710,7 @@ class SketchSessionRunner extends SessionRunner {
   }
   
   handleNoMoreCodeToRun() {
+    this.readyForEvents = true;
     this.isRunningFunction = false;    
     if (this.parentElement && this.interpreter.hasProperty(this.interpreter.global, 'setup') && ! this.hasRunSetup) {
       this.hasRunSetup = true;
