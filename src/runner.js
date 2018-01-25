@@ -697,11 +697,11 @@ class SketchSessionRunner extends SessionRunner {
     if (this.parentElement && this.nextEvents && this.nextEvents.length > 0) {
       let next = this.nextEvents.pop();
       if (this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next)) {
-        console.log("will run", next);
+        // console.log("will run", next);
         this.isRunningFunction = true; 
         setTimeout(() => this.runFunction(next), 0);
       } else {
-        console.log("not running", next, this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next));
+        // console.log("not running", next, this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next));
       }
     }    
   }
