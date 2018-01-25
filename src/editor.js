@@ -79,7 +79,7 @@ class Editor extends Component {
       lineWrapping: false,
       fixedGutter: false,
       gutters: ['CodeMirror-lint-markers'],
-      keyMap: 'sublime',
+      // keyMap: 'sublime',
       highlightSelectionMatches: true, // highlight current search match
       lint: {
         onUpdateLinting: debounce((annotations) => {
