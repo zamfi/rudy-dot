@@ -21,6 +21,7 @@
 	display: inline-block;
 	margin: 0 20px 0 0;
 	font-size: 14px;
+  vertical-align: middle;
 }
 
 .toolbar-entry.save {
@@ -35,6 +36,11 @@
 .toolbar-entry input {
 	position: relative;
 	top: 4px;
+}
+
+.toolbar-entry input[type="checkbox"] {
+  position: relative;
+  top: revert;
 }
 
 .cm-container {

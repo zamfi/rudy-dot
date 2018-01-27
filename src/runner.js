@@ -130,7 +130,7 @@ class CodeRunner {
   }
   nodeEvaluationDoneHandler(frame, stack) {
     // frame is still on the stack
-    if (this.editor) {
+    if (this.editor && this.editor.props.showExecution) {
       this.editor.unhighlightNode(frame, stack);
       let previousFrame = stack[stack.length-2]; // frame is top of stack
       if (frame.node.type === "BlockStatement" && previousFrame.node.type === "CallExpression") {
