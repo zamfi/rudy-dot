@@ -386,18 +386,24 @@ class BaseToolbar extends Component {
     }
   }
   
-  render() {
+  basicControls() {
     let buttons = this.buttons();
     
-    return <div className="toolbar">
+    return <React.Fragment>
         <div className="toolbar-entry">
           {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry execution-controls">
-          Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br/>
-          <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} checked={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
+          <label><span className="name">Speed</span> <span className="control"><input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /></span></label>
+          <label><span className="name">Show</span> <span className="control"><input type="checkbox" disabled={! this.props.canChangeShowExecution} checked={this.props.showExecution} onChange={this.props.setShowExecution} /> execution</span></label>
         </div>
+      </React.Fragment>
+  }
+  
+  render() {
+    return <div className="toolbar">
+        {this.basicControls()}
       </div>
   }
   
@@ -446,20 +452,9 @@ class RudyToolbar extends BaseToolbar {
     return Object.assign(super.extra(), {type: 'rudy'});
   }
 
-  render() {
-    let buttons = this.buttons();
-    
+  render() {    
     return <div className="toolbar">
-        <div className="toolbar-entry">
-          {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
-        </div>
-        <SaveWidget status={this.props.saveState} label={this.props.saveState} />
-        <div className="toolbar-entry execution-controls">
-          Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br />
-          <label>Show execution: <input type="checkbox" disabled={! this.props.canChangeShowExecution} checked={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
-        </div>
-        <div className="toolbar-entry">
-        </div>
+        {this.basicControls()}
         <div className="toolbar-entry">
           {this.props.extra.clonedFrom ? <a className="link" onClick={() => this.previousLevel()}> &laquo; go back </a> : null}
         </div>

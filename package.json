@@ -9,9 +9,9 @@
     "jshint": "^2.9.5",
     "mongodb": "~2.2.19",
     "p5": "^0.6.0",
-    "react": "^15.6.1",
-    "react-dom": "^15.6.1",
-    "react-scripts": "1.0.17",
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "react-scripts": "^1.1.0",
     "source-map-explorer": "^1.4.0"
   },
   "scripts": {
