@@ -29,6 +29,10 @@
   width: 45px;
 }
 
+.toolbar-entry.execution-controls {
+  text-align: center;
+}
+
 .toolbar-entry:last-child {
 	margin: 0;
 }

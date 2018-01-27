@@ -389,8 +389,9 @@ class BaseToolbar extends Component {
           {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
-        <div className="toolbar-entry">
-          Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} />
+        <div className="toolbar-entry execution-controls">
+          Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br/>
+          <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} value={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
         </div>
       </div>
   }
@@ -448,7 +449,7 @@ class RudyToolbar extends BaseToolbar {
           {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
-        <div className="toolbar-entry" style={{textAlign: "center"}}>
+        <div className="toolbar-entry execution-controls">
           Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br />
           <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} value={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
         </div>
