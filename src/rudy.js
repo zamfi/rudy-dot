@@ -113,10 +113,15 @@ class Rudy extends Component {
   }
   
   freshPageView() {
+    let level = Number(window.location.hash.substr(1) || 1)
+    if (isNaN(level)) {
+      level = 1;
+    }
+    
     return (
       <div className="app homepage">
         <h1>Rudy the Red Dot</h1>
-        <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>Start puzzles at level 1 &raquo;</a>
+        <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: level})}>Start puzzles at level {level} &raquo;</a>
         <a className="link" onClick={() => this.createNewSketch({type: 'p5'})}>Create p5.js playground &raquo;</a>
       </div>
     );
@@ -391,7 +396,7 @@ class BaseToolbar extends Component {
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry execution-controls">
           Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br/>
-          <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} value={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
+          <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} checked={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
         </div>
       </div>
   }
@@ -451,7 +456,7 @@ class RudyToolbar extends BaseToolbar {
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry execution-controls">
           Speed: <input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /><br />
-          <label>Show execution: <input type="checkbox" disabled={this.props.canChangeShowExecution ? "" : "disabled"} value={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
+          <label>Show execution: <input type="checkbox" disabled={! this.props.canChangeShowExecution} checked={this.props.showExecution} onChange={this.props.setShowExecution} /></label>
         </div>
         <div className="toolbar-entry">
         </div>
