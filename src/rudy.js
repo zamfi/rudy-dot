@@ -51,6 +51,13 @@ class Rudy extends Component {
   }
   
   componentDidMount() {
+    let queryGistClone = this.getQueryGistId();
+    
+    if (queryGistClone !== undefined) {
+      this.cloneFromGist(queryGistClone, {type: 'p5'});
+      return;
+    }
+    
     let sketchId = this.getUrlSketchId();
     
     if (sketchId !== undefined) {
@@ -60,7 +67,7 @@ class Rudy extends Component {
     window.onpopstate = (event) => {
       this.loadSketch(this.getUrlSketchId());
     }
-  }  
+  }
   
   normalView() {
     // console.log("normal view of type", this.state.extra.type);
@@ -106,8 +113,8 @@ class Rudy extends Component {
     return (
       <div className="app">
       {this.state.loadingError
-        ? <p>Failed to load your sketch... Try a <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>new sketch</a>?</p>
-        : <p>Loading your sketch...</p> }
+        ? <p>Failed to load sketch... Try a <a className="link" onClick={() => this.createNewSketch({type: 'rudy', level: 1})}>new sketch</a>?</p>
+        : <p>Loading sketch...</p> }
       </div>
     )
   }
@@ -129,7 +136,7 @@ class Rudy extends Component {
   
   render() {
     if (this.state.sketchId === null) {
-      if (this.getUrlSketchId() !== undefined) {
+      if (this.getUrlSketchId() !== undefined || this.getQueryGistId() !== undefined) {
         return this.loadingView()
       } else {
         return this.freshPageView();        
@@ -198,6 +205,13 @@ class Rudy extends Component {
       cloneCode: this.state.sketchId
     })}`));
   }
+  
+  cloneFromGist(gistId, extra) {
+    this.updateStateFromResponse(fetch(`/api/new?${queryString({
+      extra: JSON.stringify(Object.assign({}, extra, {executionSpeed: this.state.executionSpeed})),
+      cloneGist: gistId
+    })}`));
+  }
 
   loadSketch(sketchId) {
     this.updateStateFromResponse(fetch(`/api/read?id=${sketchId}`))
@@ -209,6 +223,13 @@ class Rudy extends Component {
       return pathComponents[2];
     }
     return undefined;
+  }
+  
+  getQueryGistId() {
+    let query = new Map(window.location.search.substr(1).split('&').map(v => v.split('=')))
+    if (query.has('cloneGist')) {
+      return query.get('cloneGist');
+    }
   }
   
   noteErrors(errors) {

@@ -4,6 +4,7 @@ let fs = require('fs');
 let url = require('url');
 let util = require('util');
 let mime = require('mime');
+let fetch = require('node-fetch');
 // let ejs = require('ejs');
 
 let files = require("./files");
@@ -67,8 +68,20 @@ async function apiNew(req, res) {
   }
 
   const template = parsedExtra.type || 'rudy';  
+  let initialCode = savedCode[template];
+  if (params.query.cloneGist) {
+    try {
+      initialCode = {
+        d: await (await fetch(`https://gist.githubusercontent.com/${params.query.cloneGist}/raw`)).text()
+      };
+    } catch (err) {
+      console.log("unable to retrieve gist data", err);
+      send500(res, err);
+      return;
+    }
+  }
 
-  let newDoc = {latestCode: savedCode[template].d, versions: [savedCode[template]]};
+  let newDoc = {latestCode: initialCode.d, versions: [initialCode]};
 
   if (isCloning) {
     try {
