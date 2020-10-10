@@ -98,7 +98,7 @@ class CodeRunner {
           previousFrame.node.type === "CallExpression") {
         // console.log("I think this is a call where we should check stuff", frame, previousFrame);
         // show the parent scope
-        this.visibleScopes.push(this.editor.showFrameScope(frame));
+        this.visibleScopes.push([this.editor.showFrameScope(frame)]);
       }
       if (CodeRunner.shouldTriggerExpressionDemonstrator(frame.node) && ! this.activeExpressionDemonstrator) {
         this.runAfterStep(() => {
@@ -135,14 +135,17 @@ class CodeRunner {
       let previousFrame = stack[stack.length-2]; // frame is top of stack
       if (frame.node.type === "BlockStatement" && previousFrame.node.type === "CallExpression") {
         // call is done, remove it.
-        this.editor.removeFrameScope(frame);
-        this.visibleScopes.pop();
+        this.visibleScopes.pop().forEach(s => s.remove());
       } else {
-        this.visibleScopes.forEach((scope) => scope.update());
+        this.visibleScopes.forEach(list => list.forEach(scope => scope.update()));
       }
-      if (frame.node.type === "VariableDeclaration" && frame.scope.parentScope === null) { 
-        // global variable -- add a viewer for just this/these variable(s)!
-        this.visibleScopes.push(...this.editor.showGlobalVariables(frame));
+      if (frame.node.type === "VariableDeclaration") {
+        if (frame.scope.parentScope === null) {
+          // global variable -- add a viewer for just this/these variable(s)!
+          this.visibleScopes.push(this.editor.showGlobalVariables(frame));
+        } else {
+          this.visibleScopes[this.visibleScopes.length-1].push(...this.editor.showLocalVariables(frame));
+        }
       }
       if (this.activeExpressionDemonstrator) {
         let demonstrator = this.activeExpressionDemonstrator;

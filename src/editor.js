@@ -181,6 +181,23 @@ class Editor extends Component {
     }).filter(h => h !== null);
   }
   
+  showLocalVariables(frame) {
+    return frame.node.declarations.map(decl => {
+      let elt = document.createElement('div')
+      elt.className = "callout"
+    
+      let handler = new SingleVarTracker(frame.scope, decl, elt);
+      handler.render();
+
+      let pos = this._cm.posFromIndex(decl.init ? decl.init.start : decl.end);
+      this._cm.addWidget(pos, elt);
+      
+      extra(decl).callout = handler;
+      
+      return handler;
+    }).filter(h => h !== null);    
+  }
+  
   showFrameScope(frame) {
     let node = frame.node;
     let scope = frame.scope;
@@ -202,6 +219,9 @@ class Editor extends Component {
   removeFrameScope(frame) {
     if (frame.node.__extra && frame.node.__extra.scope) {
       frame.node.__extra.scope.remove();
+      if (frame.node.__extra.subscopes) {
+        frame.node.__extra.subscopes.forEach(v => v.remove());
+      }
     }
   }
   
@@ -241,6 +261,15 @@ class Scope {
     return v.nativeFunc ? (v.__name || v.nativeFunc.name) : (v.node.id ? v.node.id.name : (plainText ? "anonymous" : "<em>anonymous</em>"))
   }
   
+  static tableIfy(arrOfObjects, strong=false, depth=0) {
+    let cNames = Object.keys(arrOfObjects[0].properties);
+    return '<table><thead>'+
+      '<tr><th><em>#</em></th>'+cNames.map(name => '<th>'+hideBadEntities(name)+'</th>').join('')+'</tr>'+
+      '</thead><tbody>'+
+      arrOfObjects.map((o,i) => '<tr><th>'+i+'</th>'+cNames.map(name => '<td>'+Scope.stringValue(o.properties[name], strong, depth+1)+'</td>').join('')+'</tr>').join('')+
+      '</tbody></table>'
+  }
+  
   static stringValue(v, strong=true, depth=0) {
     if (depth > 3) {
       return "...";
@@ -250,7 +279,11 @@ class Scope {
       case 'Function':
         return `function <strong>${Scope.functionName(v)}</strong>`;
       case 'Array':
-        return `[${Array.from(v.properties).map((v, i) => `<sup>#${i}</sup>`+Scope.stringValue(v, strong, depth+1)).join(', ')}]`;
+        let arr = Array.from(v.properties)
+        if (depth === 0 && arr.length > 0 && arr.every(e => (typeof(e) === 'object' && e.class !== 'Function' && (! (e.__native) || ! ('toString' in e.__native))))) {
+          return Scope.tableIfy(arr, strong, depth+1)
+        }
+        return `[${arr.map((v, i) => `<sup>#${i}</sup>`+Scope.stringValue(v, strong, depth+1)).join(', ')}]`;
       default:
         // normal object?
         if (v.__native && 'toString' in v.__native) {
@@ -263,8 +296,11 @@ class Scope {
         }
         return `{${keys.map(k => k+": "+Scope.stringValue(src[k], strong, depth+1)).join(', ')}}`;
       }
-    } else if (typeof(v) === 'string'){
+    } else if (typeof(v) === 'string') {
       return strong ? `"<strong>${hideBadEntities(v)}</strong>"` : `"${hideBadEntities(v)}"`;
+    } else if (typeof(v) === 'number') {
+      let s = String(v).replace(/(\.\d\d\d)\d+$/, '$1(…)');
+      return strong ? `<strong>${s}</strong>` : s;
     } else {
       return strong ? `<strong>${hideBadEntities(String(v))}</strong>` : hideBadEntities(String(v));
     }
@@ -307,6 +343,7 @@ class Scope {
     this.elt.innerHTML = ['<table class="scope">',
       this.scope.properties
         ? Object.keys(this.scope.properties)
+            .filter(k => ! this.scope.varz || this.scope.varz.indexOf(k) < 0)
             .filter(this.showHidden ? k => k : k => k !== 'this' && k !== 'arguments')
             .map(k => `<tr class="scope-entry"><th>${k}</th><td>${this.value(k)}</td></tr>`)
             .join("")
@@ -332,7 +369,8 @@ class SingleVarTracker {
   }
   
   render() {
-    this.elt.innerHTML = `<div class="variable">${Scope.stringValue(this.scope.properties[this.name])}</div>`
+    let v = Scope.stringValue(this.scope.properties[this.name]);
+    this.elt.innerHTML = `<div class="variable">${v}</div>`
   }
   
   update() {

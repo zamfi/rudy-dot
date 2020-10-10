@@ -95,6 +95,22 @@
   white-space: nowrap;
 }
 
+.callout table {
+  display: inline-block;
+  vertical-align: middle;
+}
+.callout .expression-list table {
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+  border-radius: 5px;
+}
+.callout th, .callout td {
+  padding: 0 7px;
+}
+.callout th {
+  font-weight: normal;
+}
+
 .callout .expression-list {
   position: relative;
   background: rgba(238, 255, 212, 0.85);
