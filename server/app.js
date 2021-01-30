@@ -290,7 +290,7 @@ let server = require('http').createServer(async (req, res) => {
     try {
       let fullPath = 'build' + safePath;
       if ((await util.promisify(fs.stat)(fullPath)).isFile()) {
-        res.writeHead(200, {'Content-Type': mime.lookup(safePath)});
+        res.writeHead(200, {'Content-Type': mime.getType(safePath)});
         fs.createReadStream(fullPath).pipe(res);
       } else {
         console.log("unknown request", path);
