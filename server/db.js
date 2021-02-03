@@ -1,6 +1,11 @@
 let util = require('util');
 
 var mongodb = require('mongodb');
+// To have launchd start mongodb/brew/mongodb-community now and restart at login:
+//   brew services start mongodb/brew/mongodb-community
+// Or, if you don't want/need a background service you can just run:
+//   mongod --config /opt/homebrew/etc/mongod.conf
+
 var client = new mongodb.Db('rudy', new mongodb.Server("127.0.0.1", 27017, {auto_reconnect: true}), {safe: true});
 
 var debug = false;

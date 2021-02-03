@@ -68,6 +68,7 @@ class Editor extends Component {
   }
 	
 	componentDidMount() {
+    // console.log("making CM", Editor.lintOptions)
     this._cm = CodeMirror(this.cmContainer, { // eslint-disable-line
       theme: `${this.props.theme}`,
 			mode: "javascript",
@@ -91,7 +92,7 @@ class Editor extends Component {
             if (annotations.length > 1 && x.message.startsWith("Unrecoverable syntax error")) {
               return;
             }
-            // console.log(x);
+            // console.log(x, Editor.lintOptions);
             if (x.from.line > -1) {
               this.createError(x.severity, (x.from.line - 1), x.from.ch, x.message);
             }
@@ -247,7 +248,8 @@ class Editor extends Component {
 Editor.lintOptions = {
   'asi': true,
   'eqeqeq': false,
-  '-W041': false
+  '-W041': false,
+  '-W083': false // loopfunc
 };
 
 class Scope {
