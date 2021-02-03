@@ -679,7 +679,18 @@ class SketchSessionRunner extends SessionRunner {
      'touchStarted',
      'touchMoved',
      'touchEnded'
-    ].forEach(k => p5[k] = () => this.eventTriggered(k));
+    ].forEach(k => {
+      if (k === 'mouseClicked' || k === 'mousePressed' || k === 'touchStarted') {
+        p5[k] = event => {
+          // console.log(event.target.constructor === HTMLCanvasElement);
+          if (event.target.constructor === HTMLCanvasElement) {
+            this.eventTriggered(k);
+          }
+        } 
+      } else {
+        p5[k] = () => this.eventTriggered(k);
+      }
+    });   
   }
   
   eventTriggered(eventName) {

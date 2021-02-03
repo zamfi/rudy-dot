@@ -103,7 +103,7 @@ class Rudy extends Component {
             showExecution={this.state.showExecution}
             onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
-          <RudySidebar updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
+          <RudySidebar showSyntaxView={this.state.extra.type !== 'p5'} updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
         </div>
       </div>
     );
@@ -412,7 +412,7 @@ class BaseToolbar extends Component {
     
     return <React.Fragment>
         <div className="toolbar-entry">
-          {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={button.action}>{button.title}</button>)}
+          {buttons.map(button => <button key={button.type} className={`action button ${button.type}`} onClick={(event) => { button.action(event); event.preventDefault(); return false; }}>{button.title}</button>)}
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry execution-controls">
@@ -494,7 +494,7 @@ class RudySidebar extends Component {
     return <div id="rudy-sidebar">
       <RudyDisplay {...this.props} />
       <div className="canvas-toolbar"><button className="button refresh" disabled={this.props.isRunning} onClick={this.props.refreshFrame}>⟳ Refresh</button></div>
-      <RudySyntaxHelper />
+      {this.props.showSyntaxView ? <RudySyntaxHelper /> : ''}
     </div>
   }
 }

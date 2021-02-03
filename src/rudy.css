@@ -76,7 +76,7 @@
 .cm-container {
 	border: 1px solid #ccc;
 	flex-grow: 1;
-	display: flex;
+	/* display: flex; */
 	position: relative;
 }
 
@@ -97,7 +97,9 @@ html {
 .editor-panel {
 	position: relative;
 	display: flex;
+  flex-grow: 1;
 	flex-direction: row;
+  max-height: 100vh;
 	top: 0px;
 	bottom: 0px;
 	right: 0px;
@@ -119,7 +121,7 @@ html {
 	position: relative;
 	top: 0px;
 	bottom: 0px;
-	overflow-y: scroll;
+	/* overflow-y: scroll; */
 }
 
 .rudy-syntax-helper {
@@ -127,7 +129,9 @@ html {
 	padding: 0 10px;
 	position: relative;
 	top: 0px;
-	bottom: 0px;
+  flex-grow: 1;
+  overflow: scroll;
+	/* bottom: 0px; */
 }
 
 .button {
