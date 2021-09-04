@@ -498,6 +498,22 @@ class SessionRunner {
   }
 }
 
+const EVENT_FUNCTIONS = [
+  'keyPressed', 
+  'keyReleased', 
+  'keyTyped',
+  'mouseMoved',
+  'mouseDragged',
+  'mousePressed',
+  'mouseReleased',
+  'mouseClicked',
+  'doubleClicked',
+  'mouseWheel',
+  'touchStarted',
+  'touchMoved',
+  'touchEnded'
+];
+
 class SketchSessionRunner extends SessionRunner {
   nativeToPseudo(interpreter, nativeObj, depth = 0) {
     if (depth > 30) {
@@ -666,20 +682,7 @@ class SketchSessionRunner extends SessionRunner {
       this.eventTriggered('draw');
     }
     
-    ['keyPressed', 
-     'keyReleased', 
-     'keyTyped',
-     'mouseMoved',
-     'mouseDragged',
-     'mousePressed',
-     'mouseReleased',
-     'mouseClicked',
-     'doubleClicked',
-     'mouseWheel',
-     'touchStarted',
-     'touchMoved',
-     'touchEnded'
-    ].forEach(k => {
+    EVENT_FUNCTIONS.forEach(k => {
       if (k === 'mouseClicked' || k === 'mousePressed' || k === 'touchStarted') {
         p5[k] = event => {
           // console.log(event.target.constructor === HTMLCanvasElement);
@@ -731,6 +734,9 @@ class SketchSessionRunner extends SessionRunner {
       this.runFunction('setup')
     } else if (this.parentElement && this.interpreter.hasProperty(this.interpreter.global, 'draw') && this.p5._loop) {
       this.runNextEvent();
+    } else if (this.parentElement && this.p5._loop && 
+        EVENT_FUNCTIONS.some(k => this.interpreter.hasProperty(this.interpreter.global, k))) {
+      setTimeout(() => this.runNextEvent(), 100);
     } else {
       // console.log("Really done!");
       this.isFinished = true;

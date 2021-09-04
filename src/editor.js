@@ -268,7 +268,7 @@ class Scope {
     return '<table><thead>'+
       '<tr><th><em>#</em></th>'+cNames.map(name => '<th>'+hideBadEntities(name)+'</th>').join('')+'</tr>'+
       '</thead><tbody>'+
-      arrOfObjects.map((o,i) => '<tr><th>'+i+'</th>'+cNames.map(name => '<td>'+Scope.stringValue(o.properties[name], strong, depth+1)+'</td>').join('')+'</tr>').join('')+
+      arrOfObjects.map((o,i) => '<tr><th>'+i+'</th>'+cNames.map(name => '<td>'+(name in o.properties ? Scope.stringValue(o.properties[name], strong, depth+1) : '')+'</td>').join('')+'</tr>').join('')+
       '</tbody></table>'
   }
   
