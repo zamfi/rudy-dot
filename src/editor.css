@@ -130,3 +130,15 @@
   height: 0px;
   overflow: hidden;
 }
+
+.callout.expression-demonstrator {
+  /* visibility: hidden; */
+}
+
+.callout.vartracker {
+  /* visibility: hidden; */
+}
+
+.nodehighlight {
+  /* background: none !important;  */
+}

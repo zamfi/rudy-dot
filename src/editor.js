@@ -141,7 +141,7 @@ class Editor extends Component {
     var startPos = this._cm.posFromIndex(frame.node.start);
     var endPos = this._cm.posFromIndex(frame.node.end);
     
-    var mark = this._cm.markText(startPos, endPos, {className:'eval'+stack.length});
+    var mark = this._cm.markText(startPos, endPos, {className:'nodehighlight eval'+stack.length});
 
     if (! frame.node.__extra) {
       frame.node.__extra = {};
@@ -165,7 +165,7 @@ class Editor extends Component {
     return frame.node.declarations.map(decl => {
       if (! extra(decl).callout) {
         let elt = document.createElement('div')
-        elt.className = "callout"
+        elt.className = "callout vartracker"
       
         let handler = new SingleVarTracker(frame.scope, decl, elt);
         handler.render();
@@ -185,7 +185,7 @@ class Editor extends Component {
   showLocalVariables(frame) {
     return frame.node.declarations.map(decl => {
       let elt = document.createElement('div')
-      elt.className = "callout"
+      elt.className = "callout vartracker"
     
       let handler = new SingleVarTracker(frame.scope, decl, elt);
       handler.render();
@@ -204,7 +204,7 @@ class Editor extends Component {
     let scope = frame.scope;
     
     let scopeViewElement = document.createElement('div');
-    scopeViewElement.className = "callout";
+    scopeViewElement.className = "callout vartracker";
     
     let scopeHandler = new Scope(scope, scopeViewElement);
     scopeHandler.render();

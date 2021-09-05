@@ -16,7 +16,10 @@ class Rudy extends Component {
     this.state = {
       controllerState: 'stopped',
       executionSpeed: 4,
-      showExecution: true,
+      hyperExecution: false,
+      showExpressionEvaluation: true,
+      highlightEvaluatedExpressions: true,
+      showVariableValues: true,
       type: "rudy",
       extra: {},
       saveState: 'saved',
@@ -32,7 +35,10 @@ class Rudy extends Component {
       'resume',
       'step',
       'changeSpeed',
-      'setShowExecution',
+      'setHyperExecution',
+      'setShowExpressionEvaluation',
+      'setHighlightEvaluatedExpressions',
+      'setShowVariableValues',
       'updateCanvasParent',
       'codeChangeHandler',
       'createNewSketch',
@@ -79,7 +85,6 @@ class Rudy extends Component {
           runState={this.state.controllerState}
           saveState={this.state.saveState}
           executionSpeed={this.state.executionSpeed}
-          showExecution={this.state.showExecution}
           runFn={this.run}
           stopFn={this.stop} 
           resetFn={this.reset}
@@ -87,8 +92,15 @@ class Rudy extends Component {
           resumeFn={this.resume}
           stepFn={this.step}
           changeSpeed={this.changeSpeed}
-          setShowExecution={this.setShowExecution}
-          canChangeShowExecution={this.state.controllerState === 'stopped'}
+          canChangeHyperExecution={this.state.controllerState === 'stopped'}
+          setHyperExecution={this.setHyperExecution}
+          hyperExecution={this.state.hyperExecution}
+          setShowVariableValues={this.setShowVariableValues}
+          showVariableValues={this.state.showVariableValues}
+          setShowExpressionEvaluation={this.setShowExpressionEvaluation}
+          showExpressionEvaluation={this.state.showExpressionEvaluation}
+          setHighlightEvaluatedExpressions={this.setHighlightEvaluatedExpressions}
+          highlightEvaluatedExpressions={this.state.highlightEvaluatedExpressions}
           loadSketch={this.loadSketch}
           cloneCurrentSketch={this.cloneCurrentSketch}
           extra={this.state.extra}
@@ -100,7 +112,7 @@ class Rudy extends Component {
             initialCode={this.state.loadedCode} 
             theme={this.state.extra.type === 'p5' ? 'playground' : 'default'}
             ref={(ed) => this._editor = ed} 
-            showExecution={this.state.showExecution}
+            showExecution={! this.state.hyperExecution}
             onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
           <RudySidebar showSyntaxView={this.state.extra.type !== 'p5'} updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
@@ -382,8 +394,51 @@ class Rudy extends Component {
     this.saveSoon();
   }
   
-  setShowExecution(event) {
-    this.setState({ showExecution: !! event.target.checked });
+  setHyperExecution(event) {
+    const hyperExecution = !! event.target.checked;
+    this.setState(state => {
+      return { hyperExecution };
+    });
+  }
+
+  setHighlightEvaluatedExpressions(event) {
+    const highlightEvaluatedExpressions = !! event.target.checked;
+    this.setState(state => {
+      this._unsafe_updateStylesheet(
+        '.nodehighlight', 
+        'background', highlightEvaluatedExpressions ? 'inherit' : 'none', highlightEvaluatedExpressions ? '' : 'important');
+      return {highlightEvaluatedExpressions};
+    });
+  }
+
+  setShowExpressionEvaluation(event) {
+    const showExpressionEvaluation = !! event.target.checked;
+    this.setState(state => {
+      this._unsafe_updateStylesheet(
+        '.callout.expression-demonstrator', 
+        'visibility', showExpressionEvaluation ? 'visible' : 'hidden');
+      return {showExpressionEvaluation};
+    })
+  }
+
+  setShowVariableValues(event) {
+    const showVariableValues = !! event.target.checked;
+    this.setState(state => {
+      this._unsafe_updateStylesheet(
+        '.callout.vartracker', 
+        'visibility', showVariableValues ? 'visible' : 'hidden');
+      return {showVariableValues};
+    })
+  }
+
+  _unsafe_updateStylesheet(selector, property, value, priority="") {
+    Array.from(document.styleSheets).forEach(sheet => {
+      let rules = sheet.cssRules || sheet.rules
+      Array.from(rules).filter(rule => rule.selectorText === selector).forEach(rule => {
+        rule.style.setProperty(property, value, priority);
+        console.log('set stylesheet', selector, property, 'to', value, priority);
+      });
+    });
   }
 }
 
@@ -416,8 +471,25 @@ class BaseToolbar extends Component {
         </div>
         <SaveWidget status={this.props.saveState} label={this.props.saveState} />
         <div className="toolbar-entry execution-controls">
-          <label><span className="name">Speed</span> <span className="control"><input min="0" max="10" step="0.25" type="range" onChange={this.props.changeSpeed} value={this.props.executionSpeed} /></span></label>
-          <label><span className="name">Show</span> <span className="control"><input type="checkbox" disabled={! this.props.canChangeShowExecution} checked={this.props.showExecution} onChange={this.props.setShowExecution} /> execution</span></label>
+          <div className="toolbar-row">
+            <span className="name">Speed</span> 
+            <span className="control">
+              <input min="0" max="10" step="0.25" type="range" 
+                    onChange={this.props.changeSpeed} 
+                    value={this.props.hyperExecution ? 1000 : this.props.executionSpeed}
+                    disabled={this.props.hyperExecution} />
+              &nbsp;or&nbsp;  
+              <label><input type="checkbox" disabled={! this.props.canChangeHyperExecution} checked={this.props.hyperExecution} onChange={this.props.setHyperExecution} />🚀 (real-time)</label>
+            </span>
+            </div>
+          <div className="toolbar-row">
+            <span className="name">Show</span>
+            <span className="control">
+              <label><input type="checkbox" disabled={this.props.hyperExecution} checked={this.props.showExpressionEvaluation} onChange={this.props.setShowExpressionEvaluation}/> evaluations</label>
+              <label><input type="checkbox" disabled={this.props.hyperExecution} checked={this.props.showVariableValues} onChange={this.props.setShowVariableValues}/> variables</label>
+              <label><input type="checkbox" disabled={this.props.hyperExecution} checked={this.props.highlightEvaluatedExpressions} onChange={this.props.setHighlightEvaluatedExpressions}/> subexpression highlights</label>
+            </span>
+          </div>
         </div>
       </React.Fragment>
   }
