@@ -130,16 +130,3 @@
   height: 0px;
   overflow: hidden;
 }
-
-.callout.expression-demonstrator {
-  visibility: visible;
-}
-
-.callout.vartracker {
-  visibility: visible;
-}
-
-.nodehighlight {
-  background: inherit;
-  /* background: none !important; */
-}
