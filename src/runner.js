@@ -713,12 +713,13 @@ class SketchSessionRunner extends SessionRunner {
     }
   }
   
-  runNextEvent() {
+  runNextEvent() { // this is probably where we should construct the new graphics context.
+    // maybe start by drawing the existing image onto the new one?
     if (this.parentElement && this.nextEvents && this.nextEvents.length > 0) {
       let next = this.nextEvents.shift();
       if (this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next)) {
         // console.log("will run", next);
-        this.isRunningFunction = true; 
+        this.isRunningFunction = true;
         setTimeout(() => this.runFunction(next), 0);
       } else {
         // console.log("not running", next, this.interpreter && this.interpreter.hasProperty(this.interpreter.global, next));
@@ -726,7 +727,7 @@ class SketchSessionRunner extends SessionRunner {
     }    
   }
   
-  handleNoMoreCodeToRun() {
+  handleNoMoreCodeToRun() { // this is probably where we should flush it to the earlier canvas
     this.readyForEvents = true;
     this.isRunningFunction = false;    
     if (this.parentElement && this.interpreter.hasProperty(this.interpreter.global, 'setup') && ! this.hasRunSetup) {
