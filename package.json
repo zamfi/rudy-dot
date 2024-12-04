@@ -7,7 +7,7 @@
     "codemirror": "^5.29.0",
     "js-interpreter": "git+ssh://git@github.com/zamfi/JS-Interpreter.git",
     "jshint": "^2.9.5",
-    "mongodb": "~2.2.19",
+    "mongodb": "~3.1.13",
     "node-fetch": "^2.6.1",
     "p5": "^0.6.0",
     "react": "^16.2.0",
