@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "bson": "^1.0.4",
+    "bson": "^1.1.4",
     "codemirror": "^5.29.0",
     "js-interpreter": "git+ssh://git@github.com/zamfi/JS-Interpreter.git",
     "jshint": "^2.9.5",
