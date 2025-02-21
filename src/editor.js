@@ -201,30 +201,36 @@ class Editor extends Component {
   
   showFrameScope(frame) {
     let node = frame.node;
-    let scope = frame.scope;
+    // let scope = frame.scope;
     
     let scopeViewElement = document.createElement('div');
     scopeViewElement.className = "callout vartracker";
     
-    let scopeHandler = new Scope(scope, scopeViewElement);
+    let scopeHandler = new Scope(frame, scopeViewElement);
     scopeHandler.render();
-    
+        
+    if (! node.__extra.scopes) {
+      node.__extra.scopes = [];
+    }
+
     let pos = this._cm.posFromIndex(node.start);
-    
     this._cm.addWidget(pos, scopeViewElement);
-    node.__extra.scope = scopeHandler;
+    console.log("adding scope at", pos, "style left is", scopeViewElement.style.left);
+    scopeViewElement.style.left = Number(scopeViewElement.style.left.split('px')[0]) + (node.__extra.scopes.length * 40) + "px";
+
+    node.__extra.scopes.push(scopeHandler);
 
     return scopeHandler;
   }
   
-  removeFrameScope(frame) {
-    if (frame.node.__extra && frame.node.__extra.scope) {
-      frame.node.__extra.scope.remove();
-      if (frame.node.__extra.subscopes) {
-        frame.node.__extra.subscopes.forEach(v => v.remove());
-      }
-    }
-  }
+  // removeFrameScope(frame) {
+  //   if (frame.node.__extra && frame.node.__extra.scope) {
+  //     frame.node.__extra.scope.remove();
+  //     if (frame.node.__extra.subscopes) {
+  //       frame.node.__extra.subscopes.forEach(v => v.remove());
+  //     }
+  //   }
+  // }
   
   clearFrameScopes() {
     Array.from(document.getElementsByClassName('scope')).forEach(elt => elt.parentElement.remove());
@@ -253,8 +259,9 @@ Editor.lintOptions = {
 };
 
 class Scope {
-  constructor(scope, elt) {
-    this.scope = scope;
+  constructor(frame, elt) {
+    this.scope = frame.scope;
+    this.node = frame.node;
     this.elt = elt;
     this.showHidden = false;
   }
@@ -360,6 +367,7 @@ class Scope {
   
   remove() {
     this.elt.remove();
+    this.node.__extra.scopes = this.node.__extra.scopes.filter(v => v !== this);
   }
 }
 

@@ -1,20 +1,23 @@
 let util = require('util');
 
-var mongodb = require('mongodb');
+var { MongoClient, ObjectId } = require('mongodb');
 // To have launchd start mongodb/brew/mongodb-community now and restart at login:
 //   brew services start mongodb/brew/mongodb-community
 // Or, if you don't want/need a background service you can just run:
 //   mongod --config /opt/homebrew/etc/mongod.conf
 
-var client = new mongodb.Db('rudy', new mongodb.Server("127.0.0.1", 27017, {auto_reconnect: true}), {safe: true});
+const uri = 'mongodb://localhost:27017';
+const mongoClient = new MongoClient(uri);
+const client = mongoClient.db('rudy') // , new mongodb.Server("127.0.0.1", 27017, {auto_reconnect: true}), {safe: true});
 
 var debug = false;
 var log = debug ? function() { log.apply(log, arguments); } : function() {};
 
-exports.init = function(cb) {
-  client.open(function(err, p_client) {
-    cb(err);
-  });
+exports.init = async function() {
+  log("db layer initializing");
+  // client.open(function(err, p_client) {
+  //   cb(err);
+  // });
 };
 
 function curry(fn) {
@@ -48,72 +51,61 @@ exports.in = function(collectionName) {
 //   }
 // }
 
-exports.update = function(collectionName, id, obj, cb) {
-  client.collection(collectionName, function(err, collection) {
-    if (err) {
-      log("failed to update", err);
-      return cb(err);
-    }
-    collection.updateOne({_id: new mongodb.ObjectID(id)}, obj, {upsert: false}, function(err, result) {
-      if (err) {
-        log("failed to update (2)", err);
-        return cb(err);
-      }
-      log("saved.");
-      cb(null, result.modifiedCount);
-    });
-  })
+exports.update = async function(collectionName, id, obj, cb) {
+  const collection = client.collection(collectionName) //, function(err, collection) {
+  const result = await collection.updateOne({_id: new ObjectId(id)}, obj, {upsert: false}) //, function(err, result) {
+      // if (err) {
+      //   log("failed to update (2)", err);
+      //   return cb(err);
+      // }
+      // log("saved.");
+  return result.modifiedCount;
 };
 
-exports.create = function(collectionName, obj, cb) {
-  client.collection(collectionName, function(err, collection) {
-    if (err) {
-      log("failed to create", err);
-      return cb(err);
-    }    
-    collection.insertOne(obj, function(err, doc) {
-      if (err) {
-        log("failed to create (2)", err);
-        return cb(err);
-      }
-      log("created.");
-      cb(null, doc);
-    });
-  });
+exports.create = async function(collectionName, obj) {
+  let collection = client.collection(collectionName)//, function(err, collection) {
+    // if (err) {
+    //   log("failed to create", err);
+    //   return cb(err);
+    // }    
+  return await collection.insertOne(obj); 
 };
 
-exports.get = function(collectionName, id, cb) {
-  client.collection(collectionName, function(err, collection) {
-    if (err) {
-      log("failed to read", err);
-      return cb(err);
-    }    
-    collection.find({_id: new mongodb.ObjectID(id)}).limit(1).next(function(err, doc) {
-      if (err) {
-        log("failed to read (2)", err);
-        return cb(err);
-      }
-      log("read", doc);
-      cb(null, doc);
-    });
-  });
+exports.get = async function(collectionName, id) {
+  try {
+    let collection = client.collection(collectionName) // , function(err, collection) {
+    let doc = await collection.findOne({_id: new ObjectId(id)}) 
+    log("read", doc);
+    return doc;
+  } catch (e) {
+    console.log("failed to read for id", id, "error", e);
+  }
+  //.limit(1).next(function(err, doc) {
+    //   if (err) {
+    //     log("failed to read (2)", err);
+    //     return cb(err);
+    //   }
+    //   log("read", doc);
+    //   cb(null, doc);
+    // });
+  // });
 };
 
-exports.all = function(collectionName, cb) {
-  client.collection(collectionName, function(err, collection) {
-    if (err) {
-      log("failed to read", err);
-      return cb(err);
-    }
-    collection.find().toArray(function(err, docs) {
-      if (err) {
-        cosnole.log("failed to read (2)", err);
-        return cb(err);
-      }
+exports.all = async function(collectionName, cb) {
+  const collection = client.collection(collectionName) //  function(err, collection) {
+    // if (err) {
+    //   log("failed to read", err);
+    //   return cb(err);
+    // }
+    let docs = await collection.find().toArray() //function(err, docs) {
+      // if (err) {
+      //   cosnole.log("failed to read (2)", err);
+      //   return cb(err);
+      // }
       log("read many", docs);
-      cb(null, docs);
-    });
-  })
+      return docs;
+    // });
+  // })
 };
 
-['init', 'create', 'update', 'get', 'all'].forEach(name => exports[name] = util.promisify(exports[name]));
+// ['init', 'create', 'update', 'get', 'all'].forEach(name => exports[name] = util.promisify(exports[name]));

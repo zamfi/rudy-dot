@@ -1,6 +1,9 @@
 .callout {
   z-index: 100;
 }
+.callout:hover {
+  z-index: 101;
+}
 .callout .box {
   position: relative;
 /*  height: 5px;*/

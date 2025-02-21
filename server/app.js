@@ -112,17 +112,17 @@ async function apiNew(req, res) {
         }
       });
     }
-    let doc = (await db.in('sketches').create(newDoc)).ops[0];
+    let doc = (await db.in('sketches').create(newDoc));
     
-    console.log("made new doc", doc._id);
+    console.log("made new doc", doc.insertedId);
     
     if (isCloning) {
-      await db.in('sketches').update(oldSketchId, {'$set': {'extra.clonedTo': doc._id}});
-      console.log("cloned new doc", oldSketchId, '->', doc._id);
+      await db.in('sketches').update(oldSketchId, {'$set': {'extra.clonedTo': doc.insertedId}});
+      console.log("cloned new doc", oldSketchId, '->', doc.insertedId);
     }
     sendJson(res, 200, {
       status: 'ok',
-      sketchId: doc._id, 
+      sketchId: doc.insertedId, 
       extra: doc.extra, 
       code: doc.latestCode
     });
