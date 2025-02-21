@@ -115,7 +115,12 @@ class Rudy extends Component {
             showExecution={! this.state.hyperExecution}
             onChange={this.codeChangeHandler}/>
           {this.props.showStackView ? <StackView ref={(stack) => this._stack = stack} code={this.state.latestCode} /> : ""}
-          <RudySidebar showSyntaxView={this.state.extra.type !== 'p5'} updateCanvasParent={this.updateCanvasParent} isRunning={this.state.controllerState !== 'stopped'} refreshFrame={this.refreshFrame}/>
+          <RudySidebar 
+            showSyntaxView={this.state.extra.type !== 'p5'} 
+            showConsoleView={this.state.extra.type === 'p5'}
+            updateCanvasParent={this.updateCanvasParent} 
+            isRunning={this.state.controllerState !== 'stopped'} 
+            refreshFrame={this.refreshFrame}/>
         </div>
       </div>
     );
@@ -349,7 +354,7 @@ class Rudy extends Component {
           this.setState({ everSolved: true });
         }
         this.stop();
-      })
+      }, this.state.extra.type !== 'rudy')
     });
   }
   
@@ -567,6 +572,7 @@ class RudySidebar extends Component {
       <RudyDisplay {...this.props} />
       <div className="canvas-toolbar"><button className="button refresh" disabled={this.props.isRunning} onClick={this.props.refreshFrame}>⟳ Refresh</button></div>
       {this.props.showSyntaxView ? <RudySyntaxHelper /> : ''}
+      {this.props.showConsoleView ? <RudyConsole /> : ''}
     </div>
   }
 }
@@ -646,6 +652,32 @@ This code tells Rudy to go down as long as the square Rudy is currently on is bl
 The previous example, <code>repeatDown(5)</code>, sets <code>total = 5</code> inside the body of the <code>repeatDown</code> function.
     </p>`
   return <div className="rudy-syntax-helper" dangerouslySetInnerHTML={{__html: content}} />
+}
+
+class RudyConsole extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      logs: []
+    }
+  }
+
+  componentDidMount() {
+    window.console.print = (...args) => {
+      this.setState(state => {
+        return {logs: state.logs.concat([args])};
+      });
+    }
+  }
+
+  render() {
+    return <div className="rudy-console">
+      <h3>Console <small><span title='Clear Console' size="xs" onClick={() => this.setState({logs: []})}>✕</span></small></h3>
+      <div className="console-output">
+        {this.state.logs.map((log, idx) => <div key={idx} className="console-line">{log.map((elt, idx) => <span className="console-elt" key={idx}>{JSON.stringify(elt)}</span>)}</div>)}
+      </div>
+    </div>
+  }
 }
 
 export default Rudy;

@@ -3,7 +3,7 @@
 let fs = require('fs');
 let url = require('url');
 let util = require('util');
-let mime = require('mime');
+let mime = new (require('mime').Mime)();
 let fetch = require('node-fetch');
 // let ejs = require('ejs');
 
@@ -123,8 +123,8 @@ async function apiNew(req, res) {
     sendJson(res, 200, {
       status: 'ok',
       sketchId: doc.insertedId, 
-      extra: doc.extra, 
-      code: doc.latestCode
+      extra: newDoc.extra, 
+      code: newDoc.latestCode
     });
     console.log("sent new doc");
   } catch (err) {

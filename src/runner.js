@@ -217,6 +217,7 @@ class CodeRunner {
   
   
   async prerunSamples() {
+    // console.log("prerunSamples");
     let deadline = Date.now() + 750; // 3/4 of a second from now...
     var lastSeed;
     try {
@@ -644,13 +645,23 @@ class SketchSessionRunner extends SessionRunner {
       let value = p5[k];
       if (typeof (value) === 'function') {
         let self = this;
-        let wrappedFunction = function() {
-          let args = Array.from(arguments).map(self.pseudoToNative.bind(self, interpreter));
-          // console.log("call to", k, "with args", args);
-          let result = value.call(p5, ...args);
-          // console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
-          return result === p5 ? undefined : self.nativeToPseudo(interpreter, result);
-        };
+        let wrappedFunction;
+        if (k === 'print') {
+          wrappedFunction = function() {
+            let args = Array.from(arguments).map(self.pseudoToNative.bind(self, interpreter));
+            console.print?.(...args);
+            let result = value.call(p5, ...args);
+            return result === p5 ? undefined : self.nativeToPseudo(interpreter, result);
+          };
+        } else {
+          wrappedFunction = function() {
+            let args = Array.from(arguments).map(self.pseudoToNative.bind(self, interpreter));
+            // console.log("call to", k, "with args", args);
+            let result = value.call(p5, ...args);
+            // console.log(`${k}(`, args, `) yielded`, result, result === p5, self.nativeToPseudo(interpreter, result));
+            return result === p5 ? undefined : self.nativeToPseudo(interpreter, result);
+          };          
+        }
         interpreter.setProperty(scope, k, this.createNamedNativeFunction(interpreter, wrappedFunction, k));
       } else {
         interpreter.setProperty(scope, k, ReferenceError, {
