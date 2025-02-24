@@ -3,7 +3,7 @@
 let fs = require('fs');
 let url = require('url');
 let util = require('util');
-let Mime = require('mime').Mime;
+let _mime = require('mime');
 let fetch = require('node-fetch');
 // let ejs = require('ejs');
 
@@ -11,7 +11,7 @@ let files = require("./files");
 let db = require('./db');
 
 let port = process.env.PORT || 8787;
-let mime = new Mime();
+let mime = new _mime.Mime();
 
 // let app = express.createServer();
 // let io = require('socket.io').listen(app, {'log level': 1});
