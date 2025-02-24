@@ -9,7 +9,7 @@
     "eslint-config-react-app": "^7.0.1",
     "js-interpreter": "git+ssh://git@github.com/zamfi/JS-Interpreter.git",
     "jshint": "^2.9.5",
-    "mime": "^4.0.6",
+    "mime": "^3.0.0",
     "mongodb": "6.13",
     "node-fetch": "^2.6.1",
     "p5": "^0.6.0",
