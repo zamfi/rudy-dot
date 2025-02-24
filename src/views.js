@@ -148,8 +148,9 @@ class ExpressionDemonstrator {
       var callee = this.codeAt(frame.node.callee.start, frame.node.callee.end);
       if ('func_' in frame && frame.func_ !== undefined) {
         extra(frame).checkedFunction = true;
-        if (Scope.functionName(frame.func_) !== callee && Scope.functionName(frame.func_) !== "<em>anonymous</em>") {
-          callee = Scope.functionName(frame.func_);
+        let fname = Scope.functionName(frame.func_);
+        if (fname !== callee && fname !== "<em>anonymous</em>" && fname !== "wrapper") {
+          callee = fname;
         }
       } else if (nextFrame) {
         callee = this.subRender(startIndex+1, endIndex, frame.node.callee);
@@ -273,7 +274,7 @@ class ExpressionDemonstrator {
       if (line !== this.nodeCode && line !== 'undefined' && line !== null) {
         this.lines.push(line);
       }
-    } else if (line !== null && line !== 'undefined' && this.lines[this.lines.length-1] !== line) {
+    } else if (line !== null && line !== 'undefined' && this.lines[this.lines.length-1] !== line && this.lines[this.lines.length-2] !== line) {
       this.lines.push(line);
     }
     let result = this.lines.length === 0 ? "" : `<div class="expression-list"><div class="node-code">${this.nodeCode.split('\n')[0]}</div>${this.lines.map(line => `<div class="expression">${line}</div>`).join("")}</div>`;

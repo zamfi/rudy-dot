@@ -215,7 +215,7 @@ class Editor extends Component {
 
     let pos = this._cm.posFromIndex(node.start);
     this._cm.addWidget(pos, scopeViewElement);
-    console.log("adding scope at", pos, "style left is", scopeViewElement.style.left);
+    // console.log("adding scope at", pos, "style left is", scopeViewElement.style.left, frame);
     scopeViewElement.style.left = Number(scopeViewElement.style.left.split('px')[0]) + (node.__extra.scopes.length * 40) + "px";
 
     node.__extra.scopes.push(scopeHandler);

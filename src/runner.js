@@ -607,6 +607,16 @@ class SketchSessionRunner extends SessionRunner {
         debugger; // not supported yet.
       }
     }
+
+    if (interpreter.isa(pseudoObj, interpreter.ARRAY)) {  // Array.
+      var nativeArray = [];
+      var i = 0;
+      while (interpreter.hasProperty(pseudoObj, i)) {
+        nativeArray[i] = this.pseudoToNative(interpreter, interpreter.getProperty(pseudoObj, i), depth+1);
+        i++;
+      }
+      return nativeArray;
+    }
     
     if (pseudoObj.__native) {
       // console.log("pseudo to native yields native object", pseudoObj, pseudoObj.__native);
@@ -639,7 +649,11 @@ class SketchSessionRunner extends SessionRunner {
     };
     let logFunction = this.parentElement ? alertFunction : function() { };
     interpreter.setProperty(scope, 'alert', this.createNamedNativeFunction(interpreter, logFunction, 'alert'));
-    
+    // interpreter.setProperty(scope, 'first', this.createNamedNativeFunction(interpreter, 
+    //   (arr) => this.nativeToPseudo(interpreter, this.pseudoToNative(interpreter, arr)[0]), 'first'));
+    // interpreter.setProperty(scope, 'rest', this.createNamedNativeFunction(interpreter, 
+    //   (arr) => this.nativeToPseudo(interpreter, this.pseudoToNative(interpreter, arr).slice(1)), 'rest'));
+      
     let p5 = this.p5;
     Object.keys(p5.__proto__).filter(k => ! k.startsWith('_')).forEach(k => {
       let value = p5[k];
