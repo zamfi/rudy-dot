@@ -149,7 +149,7 @@ class ExpressionDemonstrator {
       if ('func_' in frame && frame.func_ !== undefined) {
         extra(frame).checkedFunction = true;
         let fname = Scope.functionName(frame.func_);
-        if (fname !== callee && fname !== "<em>anonymous</em>" && fname !== "wrapper") {
+        if (fname !== callee && fname !== "<em>anonymous</em>" && ! frame.func_.nativeFunc) {
           callee = fname;
         }
       } else if (nextFrame) {
